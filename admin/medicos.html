@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Médicos - Clínica Saúde+</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="nav-brand">Clínica Saúde+ | Administração</div>
+            <ul class="nav-links">
+                <li><a href="dashboard.html">Início</a></li>
+                <li><a href="medicos.html">Médicos</a></li>
+                <li><a href="pacientes.html">Pacientes</a></li>
+                <li><a href="relatorios.html">Relatórios</a></li>
+                <li><a href="convenios.html">Convênios</a></li>
+            </ul>
+            <div class="nav-user">
+                <span><strong>Administrador</strong></span>
+                <a href="../index.html" class="btn btn-outline" style="padding: 5px 15px;">Sair</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <h2 style="color: var(--primary-color); margin-bottom: 30px;">Gerenciar Médicos</h2>
+
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-user-md"></i> Médicos Cadastrados</h3>
+                    <button class="btn btn-primary" onclick="document.getElementById('formCadastro').style.display='block'">+ Novo Médico</button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>CRM</th>
+                                <th>Especialidade</th>
+                                <th>Convênios Aceitos</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Dr. João Silva</td>
+                                <td>12345-SP</td>
+                                <td>Cardiologia</td>
+                                <td>Unimed, Amil, Particular</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Dra. Maria Santos</td>
+                                <td>54321-SP</td>
+                                <td>Ortopedia</td>
+                                <td>Unimed, SulAmérica, Particular</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Dr. Pedro Oliveira</td>
+                                <td>98765-SP</td>
+                                <td>Clínico Geral</td>
+                                <td>Todos</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Dra. Ana Costa</td>
+                                <td>45678-SP</td>
+                                <td>Oftalmologia</td>
+                                <td>Unimed, Bradesco, Particular</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Formulário de Cadastro (oculto inicialmente) -->
+            <div id="formCadastro" class="card mt-20" style="display: none; max-width: 700px; margin: 20px auto;">
+                <div class="card-header">
+                    <h3>Cadastrar Novo Médico</h3>
+                </div>
+
+                <form id="cadastroMedicoForm">
+                    <div class="form-group">
+                        <label for="nome">Nome Completo *</label>
+                        <input type="text" id="nome" name="nome" required placeholder="Digite o nome completo">
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="crm">CRM *</label>
+                            <input type="text" id="crm" name="crm" required placeholder="Ex: 12345-SP">
+                        </div>
+                        <div class="form-group">
+                            <label for="especialidade">Especialidade *</label>
+                            <select id="especialidade" name="especialidade" required>
+                                <option value="">Selecione</option>
+                                <option value="cardiologia">Cardiologia</option>
+                                <option value="dermatologia">Dermatologia</option>
+                                <option value="ortopedia">Ortopedia</option>
+                                <option value="pediatria">Pediatria</option>
+                                <option value="clinico-geral">Clínico Geral</option>
+                                <option value="ginecologia">Ginecologia</option>
+                                <option value="oftalmologia">Oftalmologia</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="telefone">Telefone *</label>
+                            <input type="tel" id="telefone" name="telefone" required placeholder="(00) 00000-0000">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">E-mail *</label>
+                            <input type="email" id="email" name="email" required placeholder="medico@email.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Convênios Aceitos *</label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" value="unimed" style="width: auto; margin-right: 8px;"> Unimed
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" value="amil" style="width: auto; margin-right: 8px;"> Amil
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" value="bradesco" style="width: auto; margin-right: 8px;"> Bradesco Saúde
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" value="sulamerica" style="width: auto; margin-right: 8px;"> SulAmérica
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" value="particular" style="width: auto; margin-right: 8px;"> Particular
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('formCadastro').style.display='none'">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Cadastrar Médico</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 Clínica Saúde+ - Todos os direitos reservados</p>
+        </footer>
+    </div>
+
+    <script src="../js/admin-medicos.js"></script>
+</body>
+</html>

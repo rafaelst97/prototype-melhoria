@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Convênios - Clínica Saúde+</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <div class="nav-brand">Clínica Saúde+ | Administração</div>
+            <ul class="nav-links">
+                <li><a href="dashboard.html">Início</a></li>
+                <li><a href="medicos.html">Médicos</a></li>
+                <li><a href="pacientes.html">Pacientes</a></li>
+                <li><a href="relatorios.html">Relatórios</a></li>
+                <li><a href="convenios.html">Convênios</a></li>
+            </ul>
+            <div class="nav-user">
+                <span><strong>Administrador</strong></span>
+                <a href="../index.html" class="btn btn-outline" style="padding: 5px 15px;">Sair</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <h2 style="color: var(--primary-color); margin-bottom: 30px;">Gerenciar Convênios</h2>
+
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3><i class="fas fa-building"></i> Convênios Aceitos</h3>
+                    <button class="btn btn-primary" onclick="document.getElementById('formConvenio').style.display='block'">+ Novo Convênio</button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Convênio</th>
+                                <th>Código</th>
+                                <th>Pacientes Cadastrados</th>
+                                <th>Médicos Participantes</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Unimed</strong></td>
+                                <td>UNMD-001</td>
+                                <td>85</td>
+                                <td>12</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Amil</strong></td>
+                                <td>AMIL-002</td>
+                                <td>52</td>
+                                <td>10</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Bradesco Saúde</strong></td>
+                                <td>BRAD-003</td>
+                                <td>38</td>
+                                <td>8</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>SulAmérica</strong></td>
+                                <td>SULA-004</td>
+                                <td>44</td>
+                                <td>9</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Editar</button>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;">Desativar</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Particular</strong></td>
+                                <td>PART-000</td>
+                                <td>26</td>
+                                <td>15</td>
+                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                                <td>
+                                    <button class="btn btn-outline" style="padding: 5px 10px;" disabled>Padrão</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Formulário de Cadastro de Convênio (oculto inicialmente) -->
+            <div id="formConvenio" class="card mt-20" style="display: none; max-width: 700px; margin: 20px auto;">
+                <div class="card-header">
+                    <h3>Cadastrar Novo Convênio</h3>
+                </div>
+
+                <form id="cadastroConvenioForm">
+                    <div class="form-group">
+                        <label for="nomeConvenio">Nome do Convênio *</label>
+                        <input type="text" id="nomeConvenio" name="nomeConvenio" required placeholder="Digite o nome do convênio">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="codigoConvenio">Código do Convênio *</label>
+                        <input type="text" id="codigoConvenio" name="codigoConvenio" required placeholder="Ex: CONV-005">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="descricao">Descrição</label>
+                        <textarea id="descricao" name="descricao" rows="3" placeholder="Informações adicionais sobre o convênio"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('formConvenio').style.display='none'">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Cadastrar Convênio</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar"></i> Estatísticas por Convênio</h3>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <h4 style="color: var(--primary-color);">Distribuição de Pacientes</h4>
+                        <p>Unimed: 85 (34.7%)</p>
+                        <p>Amil: 52 (21.2%)</p>
+                        <p>Bradesco: 38 (15.5%)</p>
+                        <p>SulAmérica: 44 (18%)</p>
+                        <p>Particular: 26 (10.6%)</p>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--primary-color);">Consultas Este Mês</h4>
+                        <p>Unimed: 42 consultas</p>
+                        <p>Amil: 28 consultas</p>
+                        <p>Bradesco: 18 consultas</p>
+                        <p>SulAmérica: 24 consultas</p>
+                        <p>Particular: 16 consultas</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 Clínica Saúde+ - Todos os direitos reservados</p>
+        </footer>
+    </div>
+
+    <script src="../js/admin-convenios.js"></script>
+</body>
+</html>
