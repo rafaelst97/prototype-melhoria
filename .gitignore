@@ -8,3 +8,25 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+backend/.env
+backend/__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Docker
+.docker/
+
+# Database
+*.db
+*.sqlite
