@@ -30,3 +30,20 @@ backend/__pycache__/
 # Database
 *.db
 *.sqlite
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Test screenshots (temporários)
+screenshots/
+*-error.png
+*-preenchido.png
+*-resultado.png
+test-responsive-*.png
+
+# Cache
+.cache/
+*.cover
+.coverage
+htmlcov/
