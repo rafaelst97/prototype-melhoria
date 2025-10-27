@@ -33,9 +33,9 @@ backend/__pycache__/
 
 # Node modules
 node_modules/
-package-lock.json
 
 # Test screenshots (temporários)
+tests/screenshots/
 screenshots/
 *-error.png
 *-preenchido.png
@@ -47,3 +47,7 @@ test-responsive-*.png
 *.cover
 .coverage
 htmlcov/
+
+# Playwright
+playwright-report/
+test-results/
