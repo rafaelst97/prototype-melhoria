@@ -9,7 +9,9 @@ from app.models.models import (
     HorarioDisponivel,
     BloqueioHorario,
     Consulta,
-    StatusConsulta
+    StatusConsulta,
+    Observacao,
+    Relatorio
 )
 
 __all__ = [
@@ -23,5 +25,7 @@ __all__ = [
     "HorarioDisponivel",
     "BloqueioHorario",
     "Consulta",
-    "StatusConsulta"
+    "StatusConsulta",
+    "Observacao",
+    "Relatorio"
 ]

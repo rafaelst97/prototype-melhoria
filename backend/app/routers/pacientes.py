@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List
 from datetime import datetime, date
 from app.database import get_db
-from app.models import Usuario, Paciente, Consulta, Medico, TipoUsuario, StatusConsulta
+from app.models import Usuario, Paciente, Consulta, Medico, TipoUsuario, StatusConsulta, Convenio, Especialidade
 from app.schemas import (
     PacienteCreate, PacienteUpdate, PacienteResponse,
     ConsultaCreate, ConsultaResponse, ConsultaDetalhada, ConsultaCancelar,
-    HorarioDisponivel
+    HorarioDisponivel, MedicoResponse, ConvenioResponse, EspecialidadeResponse
 )
 from app.utils.auth import get_password_hash
 from app.utils.dependencies import get_current_paciente, get_current_user
@@ -17,7 +18,8 @@ from app.utils.validators import (
     verificar_conflito_horario,
     verificar_horario_bloqueado,
     verificar_horario_disponivel,
-    gerar_horarios_disponiveis
+    gerar_horarios_disponiveis,
+    verificar_paciente_bloqueado
 )
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -28,45 +30,66 @@ def cadastrar_paciente(paciente_data: PacienteCreate, db: Session = Depends(get_
     # Verificar se email já existe
     if db.query(Usuario).filter(Usuario.email == paciente_data.email).first():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email já cadastrado"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email já cadastrado no sistema"
         )
     
     # Verificar se CPF já existe
     if db.query(Paciente).filter(Paciente.cpf == paciente_data.cpf).first():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CPF já cadastrado"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CPF já cadastrado no sistema"
         )
     
-    # Criar usuário
-    novo_usuario = Usuario(
-        email=paciente_data.email,
-        senha_hash=get_password_hash(paciente_data.senha),
-        nome=paciente_data.nome,
-        tipo=TipoUsuario.PACIENTE
-    )
-    db.add(novo_usuario)
-    db.flush()
+    try:
+        # Criar usuário
+        novo_usuario = Usuario(
+            email=paciente_data.email,
+            senha_hash=get_password_hash(paciente_data.senha),
+            nome=paciente_data.nome,
+            tipo=TipoUsuario.PACIENTE
+        )
+        db.add(novo_usuario)
+        db.flush()
+        
+        # Criar paciente
+        novo_paciente = Paciente(
+            usuario_id=novo_usuario.id,
+            cpf=paciente_data.cpf,
+            data_nascimento=paciente_data.data_nascimento,
+            telefone=paciente_data.telefone,
+            endereco=paciente_data.endereco,
+            cidade=paciente_data.cidade,
+            estado=paciente_data.estado,
+            cep=paciente_data.cep,
+            convenio_id=paciente_data.convenio_id,
+            numero_carteirinha=paciente_data.numero_carteirinha
+        )
+        db.add(novo_paciente)
+        db.commit()
+        db.refresh(novo_paciente)
+        
+        return novo_paciente
     
-    # Criar paciente
-    novo_paciente = Paciente(
-        usuario_id=novo_usuario.id,
-        cpf=paciente_data.cpf,
-        data_nascimento=paciente_data.data_nascimento,
-        telefone=paciente_data.telefone,
-        endereco=paciente_data.endereco,
-        cidade=paciente_data.cidade,
-        estado=paciente_data.estado,
-        cep=paciente_data.cep,
-        convenio_id=paciente_data.convenio_id,
-        numero_carteirinha=paciente_data.numero_carteirinha
-    )
-    db.add(novo_paciente)
-    db.commit()
-    db.refresh(novo_paciente)
-    
-    return novo_paciente
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig).lower()
+        
+        if 'email' in error_msg or 'usuario_email_key' in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email já cadastrado no sistema"
+            )
+        elif 'cpf' in error_msg or 'paciente_cpf_key' in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="CPF já cadastrado no sistema"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Erro ao cadastrar paciente: dados inválidos ou duplicados"
+            )
 
 @router.get("/perfil", response_model=PacienteResponse)
 def get_perfil(
@@ -109,10 +132,21 @@ def agendar_consulta(
     current_user: Usuario = Depends(get_current_paciente),
     db: Session = Depends(get_db)
 ):
-    """Agendar nova consulta"""
+    """
+    Agendar nova consulta
+    Caso de Uso: Agendar Consulta
+    Regra de Negócio: Máximo 2 consultas futuras por paciente
+    """
     paciente = db.query(Paciente).filter(Paciente.usuario_id == current_user.id).first()
     
-    # Validar limite de 2 consultas
+    # Verificar se paciente está bloqueado (Regra: 3 faltas consecutivas)
+    if verificar_paciente_bloqueado(db, paciente.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sua conta está bloqueada. Entre em contato com a administração."
+        )
+    
+    # Validar limite de 2 consultas (Regra de Negócio)
     if not validar_limite_consultas(db, paciente.id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -184,12 +218,18 @@ def listar_consultas(
 @router.delete("/consultas/{consulta_id}")
 def cancelar_consulta(
     consulta_id: int,
-    cancelamento: ConsultaCancelar,
     current_user: Usuario = Depends(get_current_paciente),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    motivo_cancelamento: str = None
 ):
-    """Cancelar consulta"""
+    """
+    Cancelar consulta
+    Caso de Uso: Cancelar Consulta
+    Regra de Negócio: Cancelamento apenas até 24h antes do horário agendado
+    """
     paciente = db.query(Paciente).filter(Paciente.usuario_id == current_user.id).first()
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente não encontrado")
     
     consulta = db.query(Consulta).filter(
         Consulta.id == consulta_id,
@@ -211,7 +251,7 @@ def cancelar_consulta(
             detail="Não é possível cancelar uma consulta já realizada"
         )
     
-    # Validar regra de 24h
+    # Validar regra de 24h (Regra de Negócio)
     if not validar_cancelamento_24h(consulta):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -220,11 +260,58 @@ def cancelar_consulta(
     
     consulta.status = StatusConsulta.CANCELADA
     consulta.cancelado_em = datetime.now()
-    consulta.motivo_cancelamento = cancelamento.motivo_cancelamento
+    consulta.motivo_cancelamento = motivo_cancelamento
     
     db.commit()
     
     return {"message": "Consulta cancelada com sucesso"}
+
+@router.get("/medicos", response_model=List[MedicoResponse])
+def buscar_medicos(
+    especialidade_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """Busca médicos, opcionalmente filtrados por especialidade"""
+    from app.models import Medico as MedicoModel
+    
+    query = db.query(MedicoModel)
+    
+    if especialidade_id:
+        query = query.filter(MedicoModel.especialidade_id == especialidade_id)
+    
+    medicos = query.all()
+    return medicos
+
+@router.get("/medicos/{medico_id}/horarios", response_model=dict)
+def listar_horarios_medico(
+    medico_id: int,
+    db: Session = Depends(get_db)
+):
+    """Lista todos os horários disponíveis configurados para um médico"""
+    from app.models import HorarioDisponivel as HorarioDisponivelModel
+    
+    medico = db.query(Medico).filter(Medico.id == medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=404, detail="Médico não encontrado")
+    
+    horarios = db.query(HorarioDisponivelModel).filter(
+        HorarioDisponivelModel.medico_id == medico_id,
+        HorarioDisponivelModel.ativo == True
+    ).all()
+    
+    # Converter para formato serializável
+    horarios_dict = [
+        {
+            "id": h.id,
+            "dia_semana": h.dia_semana,
+            "hora_inicio": h.hora_inicio.strftime("%H:%M"),
+            "hora_fim": h.hora_fim.strftime("%H:%M"),
+            "ativo": h.ativo
+        }
+        for h in horarios
+    ]
+    
+    return {"medico_id": medico_id, "horarios": horarios_dict}
 
 @router.get("/medicos/{medico_id}/horarios-disponiveis", response_model=HorarioDisponivel)
 def get_horarios_disponiveis(
@@ -240,3 +327,15 @@ def get_horarios_disponiveis(
     horarios = gerar_horarios_disponiveis(db, medico_id, data, medico.tempo_consulta)
     
     return {"data": data, "horarios": horarios}
+
+@router.get("/convenios", response_model=List[ConvenioResponse])
+def listar_convenios_publico(db: Session = Depends(get_db)):
+    """Lista todos os convênios ativos (endpoint público para cadastro)"""
+    convenios = db.query(Convenio).filter(Convenio.ativo == True).all()
+    return convenios
+
+@router.get("/especialidades", response_model=List[EspecialidadeResponse])
+def listar_especialidades_publico(db: Session = Depends(get_db)):
+    """Lista todas as especialidades ativas (endpoint público)"""
+    especialidades = db.query(Especialidade).filter(Especialidade.ativo == True).all()
+    return especialidades

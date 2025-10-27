@@ -4,6 +4,7 @@ const API_CONFIG = {
     ENDPOINTS: {
         // Auth
         LOGIN: '/auth/login',
+        MEDICO_LOGIN: '/auth/login/medico',
         ME: '/auth/me',
         
         // Pacientes

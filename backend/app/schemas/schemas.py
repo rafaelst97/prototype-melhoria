@@ -13,6 +13,7 @@ class StatusConsulta(str, Enum):
     CONFIRMADA = "confirmada"
     CANCELADA = "cancelada"
     REALIZADA = "realizada"
+    FALTOU = "faltou"
 
 # ============ Auth Schemas ============
 class Token(BaseModel):
@@ -63,17 +64,20 @@ class EspecialidadeResponse(EspecialidadeBase):
 # ============ Convenio Schemas ============
 class ConvenioBase(BaseModel):
     nome: str
-    cnpj: Optional[str] = None
+    codigo: Optional[str] = None
     telefone: Optional[str] = None
     email: Optional[EmailStr] = None
+    descricao: Optional[str] = None
 
 class ConvenioCreate(ConvenioBase):
-    pass
+    codigo: str  # Obrigatório na criação
 
 class ConvenioUpdate(BaseModel):
     nome: Optional[str] = None
+    codigo: Optional[str] = None
     telefone: Optional[str] = None
     email: Optional[EmailStr] = None
+    descricao: Optional[str] = None
     ativo: Optional[bool] = None
 
 class ConvenioResponse(ConvenioBase):
@@ -174,7 +178,10 @@ class HorarioDisponivelBase(BaseModel):
     hora_fim: time
 
 class HorarioDisponivelCreate(HorarioDisponivelBase):
-    medico_id: int
+    pass  # medico_id é obtido do token JWT, não enviado no body
+
+class HorariosMultiplosCreate(BaseModel):
+    horarios: List[HorarioDisponivelCreate]
 
 class HorarioDisponivelResponse(HorarioDisponivelBase):
     id: int
@@ -211,19 +218,16 @@ class ConsultaCreate(ConsultaBase):
     medico_id: int
 
 class ConsultaUpdate(BaseModel):
-    observacoes_medico: Optional[str] = None
     status: Optional[StatusConsulta] = None
 
 class ConsultaCancelar(BaseModel):
-    motivo_cancelamento: str
+    motivo_cancelamento: Optional[str] = None
 
 class ConsultaResponse(ConsultaBase):
     id: int
     paciente_id: int
     medico_id: int
     status: StatusConsulta
-    observacoes: Optional[str] = None
-    observacoes_medico: Optional[str] = None
     criado_em: datetime
     cancelado_em: Optional[datetime] = None
     motivo_cancelamento: Optional[str] = None
@@ -234,6 +238,24 @@ class ConsultaResponse(ConsultaBase):
 class ConsultaDetalhada(ConsultaResponse):
     paciente: PacienteResponse
     medico: MedicoResponse
+    
+    class Config:
+        from_attributes = True
+
+# ============ Observacao Schemas ============
+class ObservacaoBase(BaseModel):
+    descricao: str
+
+class ObservacaoCreate(ObservacaoBase):
+    consulta_id: int
+
+class ObservacaoUpdate(ObservacaoBase):
+    pass
+
+class ObservacaoResponse(ObservacaoBase):
+    id: int
+    consulta_id: int
+    data_criacao: datetime
     
     class Config:
         from_attributes = True
@@ -255,6 +277,47 @@ class AdminResponse(BaseModel):
         from_attributes = True
 
 # ============ Relatorios Schemas ============
+class RelatorioBase(BaseModel):
+    tipo: str
+    parametros: Optional[str] = None
+
+class RelatorioCreate(RelatorioBase):
+    pass
+
+class RelatorioResponse(RelatorioBase):
+    id: int
+    admin_id: int
+    data_geracao: datetime
+    dados_resultado: Optional[str] = None
+    arquivo_path: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class RelatorioConsultasPorMedico(BaseModel):
+    medico_nome: str
+    especialidade: str
+    total_consultas: int
+    consultas_realizadas: int
+    consultas_canceladas: int
+
+class RelatorioConsultasPorEspecialidade(BaseModel):
+    especialidade: str
+    total_consultas: int
+    total_medicos: int
+
+class RelatorioCancelamentos(BaseModel):
+    total_consultas: int
+    total_cancelamentos: int
+    taxa_cancelamento: float
+    total_remarcacoes: int
+
+class RelatorioPacientesFrequentes(BaseModel):
+    paciente_nome: str
+    cpf: str
+    total_consultas: int
+    ultima_consulta: Optional[date] = None
+
 class EstatisticasDashboard(BaseModel):
     total_pacientes: int
     total_medicos: int
@@ -262,6 +325,8 @@ class EstatisticasDashboard(BaseModel):
     consultas_hoje: int
     consultas_semana: int
     consultas_mes: int
+    consultas_agendadas: int
+    consultas_realizadas: int
 
 class HorarioDisponivel(BaseModel):
     data: date

@@ -14,6 +14,7 @@ class StatusConsulta(str, enum.Enum):
     CONFIRMADA = "confirmada"
     CANCELADA = "cancelada"
     REALIZADA = "realizada"
+    FALTOU = "faltou"
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -49,9 +50,10 @@ class Convenio(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), unique=True, nullable=False)
-    cnpj = Column(String(18), unique=True)
+    codigo = Column(String(20), unique=True, nullable=False)
     telefone = Column(String(20))
     email = Column(String(255))
+    descricao = Column(Text)
     ativo = Column(Boolean, default=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
     
@@ -72,6 +74,7 @@ class Paciente(Base):
     cep = Column(String(10))
     convenio_id = Column(Integer, ForeignKey("convenios.id"), nullable=True)
     numero_carteirinha = Column(String(50))
+    faltas_consecutivas = Column(Integer, default=0)
     
     # Relacionamentos
     usuario = relationship("Usuario", back_populates="paciente")
@@ -105,6 +108,7 @@ class Admin(Base):
     
     # Relacionamentos
     usuario = relationship("Usuario", back_populates="admin")
+    relatorios = relationship("Relatorio", back_populates="admin")
 
 class HorarioDisponivel(Base):
     __tablename__ = "horarios_disponiveis"
@@ -141,9 +145,7 @@ class Consulta(Base):
     data = Column(Date, nullable=False)
     hora = Column(Time, nullable=False)
     status = Column(Enum(StatusConsulta), default=StatusConsulta.AGENDADA)
-    observacoes = Column(Text)
     motivo_consulta = Column(Text)
-    observacoes_medico = Column(Text)
     criado_em = Column(DateTime, default=datetime.utcnow)
     cancelado_em = Column(DateTime)
     motivo_cancelamento = Column(Text)
@@ -151,3 +153,29 @@ class Consulta(Base):
     # Relacionamentos
     paciente = relationship("Paciente", back_populates="consultas")
     medico = relationship("Medico", back_populates="consultas")
+    observacao = relationship("Observacao", back_populates="consulta", uselist=False)
+
+class Observacao(Base):
+    __tablename__ = "observacoes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    consulta_id = Column(Integer, ForeignKey("consultas.id"), unique=True, nullable=False)
+    descricao = Column(Text, nullable=False)
+    data_criacao = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    consulta = relationship("Consulta", back_populates="observacao")
+
+class Relatorio(Base):
+    __tablename__ = "relatorios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False)
+    tipo = Column(String(100), nullable=False)
+    data_geracao = Column(DateTime, default=datetime.utcnow)
+    dados_resultado = Column(Text)
+    parametros = Column(Text)
+    arquivo_path = Column(String(500))
+    
+    # Relacionamentos
+    admin = relationship("Admin", back_populates="relatorios")

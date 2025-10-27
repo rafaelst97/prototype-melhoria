@@ -1,10 +1,11 @@
 from datetime import datetime, date, timedelta, time
 from typing import List
 from sqlalchemy.orm import Session
-from app.models import Consulta, HorarioDisponivel, BloqueioHorario, StatusConsulta
+from sqlalchemy import and_, func
+from app.models import Consulta, HorarioDisponivel, BloqueioHorario, StatusConsulta, Paciente, Usuario
 
 def validar_limite_consultas(db: Session, paciente_id: int) -> bool:
-    """Verifica se o paciente tem menos de 2 consultas agendadas"""
+    """Verifica se o paciente tem menos de 2 consultas agendadas (Regra de Negócio)"""
     consultas_ativas = db.query(Consulta).filter(
         Consulta.paciente_id == paciente_id,
         Consulta.status.in_([StatusConsulta.AGENDADA, StatusConsulta.CONFIRMADA]),
@@ -14,12 +15,46 @@ def validar_limite_consultas(db: Session, paciente_id: int) -> bool:
     return consultas_ativas < 2
 
 def validar_cancelamento_24h(consulta: Consulta) -> bool:
-    """Verifica se a consulta pode ser cancelada (mais de 24h de antecedência)"""
+    """Verifica se a consulta pode ser cancelada (mais de 24h de antecedência - Regra de Negócio)"""
     data_consulta = datetime.combine(consulta.data, consulta.hora)
     agora = datetime.now()
     diferenca = data_consulta - agora
     
     return diferenca.total_seconds() > 24 * 3600
+
+def verificar_paciente_bloqueado(db: Session, paciente_id: int) -> bool:
+    """Verifica se o paciente está bloqueado por 3 faltas consecutivas (Regra de Negócio)"""
+    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
+    if not paciente:
+        return True
+    
+    usuario = db.query(Usuario).filter(Usuario.id == paciente.usuario_id).first()
+    if not usuario:
+        return True
+    
+    # Verifica se está bloqueado pela administração ou por faltas consecutivas
+    return usuario.bloqueado or paciente.faltas_consecutivas >= 3
+
+def atualizar_faltas_consecutivas(db: Session, paciente_id: int, compareceu: bool):
+    """Atualiza o contador de faltas consecutivas do paciente"""
+    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
+    if not paciente:
+        return
+    
+    if compareceu:
+        # Se compareceu, zera as faltas consecutivas
+        paciente.faltas_consecutivas = 0
+    else:
+        # Se faltou, incrementa as faltas
+        paciente.faltas_consecutivas += 1
+        
+        # Se atingiu 3 faltas, bloqueia o usuário
+        if paciente.faltas_consecutivas >= 3:
+            usuario = db.query(Usuario).filter(Usuario.id == paciente.usuario_id).first()
+            if usuario:
+                usuario.bloqueado = True
+    
+    db.commit()
 
 def verificar_conflito_horario(
     db: Session,
