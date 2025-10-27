@@ -14,36 +14,74 @@ Fornecer um sistema web responsivo que permita aos pacientes agendarem consultas
 Projeto/
 │
 ├── index.html                 # Página inicial com seleção de módulos
+├── docker-compose.yml         # Configuração Docker
+├── nginx.conf                 # Configuração Nginx
+│
 ├── css/
 │   └── style.css             # Estilos globais do sistema
 │
-├── paciente/                 # Módulo do Paciente
-│   ├── login.html           # Login de paciente
-│   ├── cadastro.html        # Cadastro de novo paciente
-│   ├── dashboard.html       # Painel principal do paciente
-│   ├── agendar.html         # Agendamento de consultas
-│   ├── consultas.html       # Visualização de consultas
-│   └── perfil.html          # Edição de perfil
+├── js/                        # Scripts JavaScript
+│   ├── api.js                # Cliente API REST
+│   ├── masks.js              # Máscaras de input (CPF, telefone, etc)
+│   ├── paciente-*.js         # Scripts do módulo paciente
+│   ├── medico-*.js           # Scripts do módulo médico
+│   └── admin-*.js            # Scripts do módulo admin
 │
-├── medico/                   # Módulo do Médico
-│   ├── login.html           # Login de médico
-│   ├── dashboard.html       # Painel principal do médico
-│   ├── agenda.html          # Visualização da agenda
-│   ├── consultas.html       # Detalhes de consultas
-│   └── horarios.html        # Gerenciamento de horários
+├── paciente/                  # Módulo do Paciente
+│   ├── login.html            # Login de paciente
+│   ├── cadastro.html         # Cadastro de novo paciente
+│   ├── dashboard.html        # Painel principal do paciente
+│   ├── agendar.html          # Agendamento de consultas
+│   ├── consultas.html        # Visualização de consultas
+│   └── perfil.html           # Edição de perfil
 │
-├── admin/                    # Módulo Administrativo
-│   ├── login.html           # Login do administrador
-│   ├── dashboard.html       # Painel administrativo
-│   ├── medicos.html         # Gerenciamento de médicos
-│   ├── pacientes.html       # Gerenciamento de pacientes
-│   ├── relatorios.html      # Geração de relatórios
-│   └── convenios.html       # Gerenciamento de convênios
+├── medico/                    # Módulo do Médico
+│   ├── login.html            # Login de médico (via CRM)
+│   ├── dashboard.html        # Painel principal do médico
+│   ├── agenda.html           # Visualização da agenda
+│   ├── consultas.html        # Detalhes e observações
+│   └── horarios.html         # Gerenciamento de horários
 │
-└── js/                       # Scripts JavaScript
-    ├── paciente-*.js        # Scripts do módulo paciente
-    ├── medico-*.js          # Scripts do módulo médico
-    └── admin-*.js           # Scripts do módulo admin
+├── admin/                     # Módulo Administrativo
+│   ├── login.html            # Login do administrador
+│   ├── dashboard.html        # Painel administrativo
+│   ├── medicos.html          # Gerenciamento de médicos
+│   ├── pacientes.html        # Gerenciamento de pacientes
+│   ├── relatorios.html       # Geração de relatórios PDF
+│   └── convenios.html        # Gerenciamento de convênios
+│
+├── backend/                   # Backend FastAPI
+│   ├── app/                  # Código da aplicação
+│   │   ├── routers/         # Endpoints REST
+│   │   ├── models/          # Models SQLAlchemy
+│   │   ├── schemas/         # Schemas Pydantic
+│   │   └── utils/           # Utilidades (auth, validators, relatórios)
+│   ├── tests/               # Testes unitários (82 testes - 100%)
+│   ├── alembic/             # Migrações de banco de dados
+│   └── requirements.txt     # Dependências Python
+│
+├── tests/                     # Testes E2E
+│   ├── e2e/                 # Scripts Playwright (13 testes)
+│   ├── screenshots/         # Screenshots dos testes
+│   └── README.md            # Documentação dos testes
+│
+├── scripts/                   # Scripts utilitários
+│   ├── start.ps1            # Iniciar projeto (Windows)
+│   ├── start.sh             # Iniciar projeto (Linux/Mac)
+│   ├── abrir-site.bat       # Abrir no navegador
+│   └── README.md            # Documentação dos scripts
+│
+├── docs/                      # Documentação do projeto
+│   ├── RESUMO_EXECUTIVO.md
+│   ├── STATUS_PROJETO_COMPLETO.md
+│   ├── TESTES_AUTOMATIZADOS.md
+│   └── ...                  # Outros documentos
+│
+└── Prompts/                   # Prompts de IA usados no projeto
+    ├── ArquiteturaSistema.txt
+    ├── CasosDeUso.txt
+    ├── MER_Estrutura.txt
+    └── ...
 ```
 
 ## 🚀 Funcionalidades Principais
@@ -89,9 +127,109 @@ Projeto/
 
 ## 🔧 Tecnologias Utilizadas
 
+### Frontend
 - **HTML5**: Estrutura das páginas
 - **CSS3**: Estilização e responsividade
-- **JavaScript**: Interatividade e validações do lado do cliente
+- **JavaScript (Vanilla)**: Interatividade e validações
+- **Font Awesome**: Ícones
+
+### Backend
+- **Python 3.11+**: Linguagem principal
+- **FastAPI**: Framework web RESTful
+- **SQLAlchemy**: ORM para banco de dados
+- **Pydantic**: Validação de dados
+- **PostgreSQL 15**: Banco de dados relacional
+- **JWT**: Autenticação e autorização
+- **ReportLab**: Geração de relatórios PDF
+- **Alembic**: Migrações de banco de dados
+
+### DevOps & Testes
+- **Docker + Docker Compose**: Containerização
+- **Nginx**: Servidor web
+- **Playwright**: Testes E2E
+- **Pytest**: Testes unitários (82 testes - 100% conformidade)
+
+## 🚀 Como Executar o Projeto
+
+### Pré-requisitos
+- Docker Desktop instalado e rodando
+- Git (opcional, para clonar o repositório)
+- Node.js 18+ (opcional, para rodar testes E2E)
+
+### Opção 1: Usando Scripts (Recomendado)
+
+**Windows:**
+```powershell
+.\scripts\start.ps1
+```
+
+**Linux/Mac:**
+```bash
+chmod +x scripts/start.sh
+./scripts/start.sh
+```
+
+### Opção 2: Docker Compose Manual
+
+```bash
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Verificar status
+docker-compose ps
+
+# Ver logs
+docker-compose logs -f
+
+# Parar serviços
+docker-compose down
+```
+
+### Opção 3: Abrir no Navegador
+
+**Windows:**
+```cmd
+.\scripts\abrir-site.bat
+```
+
+Ou acesse manualmente: **http://localhost:8081**
+
+### URLs de Acesso
+
+- **Frontend**: http://localhost:8081
+- **Backend API**: http://localhost:8000
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **pgAdmin**: http://localhost:5050 (admin@admin.com / admin)
+
+## 🧪 Executando Testes
+
+### Testes Backend (Pytest)
+
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+**Resultado esperado:** 82/82 testes passando ✅
+
+### Testes Frontend (Playwright)
+
+```bash
+# Instalar Playwright (primeira vez)
+npx playwright install chromium
+
+# Executar todos os testes
+npm test
+
+# Testes específicos
+npm run test:medico        # Suite médico completa
+npm run test:conformidade  # Validação contra requisitos
+npm run test:e2e          # Suite E2E completa
+```
+
+**Resultado esperado:** 10/11 testes passando (90.9%) ✅
+
+Veja mais detalhes em [tests/README.md](tests/README.md)
 
 ## 📖 Como Usar
 
