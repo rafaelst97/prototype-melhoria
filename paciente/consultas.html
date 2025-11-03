@@ -6,6 +6,7 @@
     <title>Minhas Consultas - Clínica Saúde+</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
+    <script src="../js/auth-guard.js"></script>
 </head>
 <body>
     <div class="container">
@@ -119,6 +120,76 @@
         <footer class="footer">
             <p>&copy; 2025 Clínica Saúde+ - Todos os direitos reservados</p>
         </footer>
+    </div>
+
+    <!-- Modal de Reagendamento -->
+    <div id="modal-reagendar" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModalReagendar()">&times;</span>
+            <h3 style="color: var(--primary-color); margin-bottom: 20px;">
+                <i class="fas fa-calendar-alt"></i> Reagendar Consulta
+            </h3>
+            
+            <div id="info-consulta-atual" style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 5px 0;"><strong>Consulta Atual:</strong></p>
+                <p id="detalhes-consulta-atual" style="margin: 5px 0; color: #555;"></p>
+            </div>
+
+            <form id="form-reagendar">
+                <div class="form-group">
+                    <label for="nova-data">Nova Data *</label>
+                    <input type="date" id="nova-data" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="nova-hora">Novo Horário *</label>
+                    <select id="nova-hora" required>
+                        <option value="">Selecione um horário</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="motivo-reagendamento">Motivo do Reagendamento (opcional)</label>
+                    <textarea id="motivo-reagendamento" rows="3" placeholder="Descreva o motivo do reagendamento..."></textarea>
+                </div>
+
+                <div id="reagendar-error-message" class="error-message" style="display: none;"></div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalReagendar()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar Reagendamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cancelamento -->
+    <div id="modal-cancelar" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModalCancelar()">&times;</span>
+            <h3 style="color: var(--accent-color); margin-bottom: 20px;">
+                <i class="fas fa-exclamation-triangle"></i> Cancelar Consulta
+            </h3>
+            
+            <div id="info-consulta-cancelar" style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 5px 0;"><strong>Atenção:</strong> Esta ação não pode ser desfeita.</p>
+                <p id="detalhes-consulta-cancelar" style="margin: 5px 0; color: #555;"></p>
+            </div>
+
+            <form id="form-cancelar">
+                <div class="form-group">
+                    <label for="motivo-cancelamento">Motivo do Cancelamento (opcional)</label>
+                    <textarea id="motivo-cancelamento" rows="3" placeholder="Descreva o motivo do cancelamento..."></textarea>
+                </div>
+
+                <div id="cancelar-error-message" class="error-message" style="display: none;"></div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalCancelar()">Voltar</button>
+                    <button type="submit" class="btn btn-tertiary">Confirmar Cancelamento</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="../js/paciente-consultas.js"></script>

@@ -6,6 +6,7 @@
     <title>Agendar Consulta - Clínica Saúde+</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
+    <script src="../js/auth-guard.js"></script>
 </head>
 <body>
     <div class="container">
@@ -62,8 +63,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="observacoes">Observações (opcional)</label>
-                        <textarea id="observacoes" name="observacoes" rows="4" placeholder="Descreva os sintomas ou motivo da consulta"></textarea>
+                        <label for="motivo">Motivo da Consulta (opcional)</label>
+                        <textarea id="motivo" name="motivo" rows="4" placeholder="Descreva os sintomas ou motivo da consulta"></textarea>
                     </div>
 
                     <div class="alert alert-warning">
@@ -72,7 +73,7 @@
 
                     <div class="form-actions">
                         <a href="dashboard.html" class="btn btn-outline">Cancelar</a>
-                        <button type="submit" class="btn btn-primary">Confirmar Agendamento</button>
+                        <button id="btnAgendar" type="submit" class="btn btn-primary">Confirmar Agendamento</button>
                     </div>
                 </form>
             </div>
