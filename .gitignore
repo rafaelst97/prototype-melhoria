@@ -48,6 +48,10 @@ test-responsive-*.png
 .coverage
 htmlcov/
 
+# Test files
+test_*.json
+*_test.json
+
 # Playwright
 playwright-report/
 test-results/
