@@ -171,7 +171,7 @@ def agendar_consulta(
         )
     
     # Verificar se médico existe
-    medico = db.query(Medico).filter(Medico.id_medico == consulta_data.id_medico_fk).first()
+    medico = db.query(Medico).filter(Medico.id_medico == consulta_data.id_medico).first()
     if not medico:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -191,7 +191,7 @@ def agendar_consulta(
     
     # Validar todas as regras de negócio
     pode_agendar, mensagem = ValidadorAgendamento.validar_novo_agendamento(
-        db, paciente_id, consulta_data.id_medico_fk,
+        db, paciente_id, consulta_data.id_medico,
         data_hora, data_hora_fim
     )
     
@@ -201,12 +201,13 @@ def agendar_consulta(
             detail=mensagem
         )
     
-    # Criar consulta (modelo usa apenas 'data_hora', não 'data_hora_inicio')
+    # Criar consulta
     nova_consulta = Consulta(
-        data_hora=data_hora,
+        data_hora_inicio=data_hora,
+        data_hora_fim=data_hora_fim,
         status="agendada",
         id_paciente_fk=paciente_id,
-        id_medico_fk=consulta_data.id_medico_fk
+        id_medico_fk=consulta_data.id_medico
     )
     
     db.add(nova_consulta)
@@ -236,7 +237,7 @@ def listar_consultas(paciente_id: int, db: Session = Depends(get_db)):
         joinedload(Consulta.paciente)
     ).filter(
         Consulta.id_paciente_fk == paciente_id
-    ).order_by(Consulta.data_hora.desc()).all()
+    ).order_by(Consulta.data_hora_inicio.desc()).all()
     
     return consultas
 
@@ -373,8 +374,9 @@ def reagendar_consulta(
             detail=msg_conflito
         )
     
-    # Reagendar (modelo usa apenas 'data_hora', não 'data_hora_inicio')
-    consulta.data_hora = nova_data_hora
+    # Reagendar consulta
+    consulta.data_hora_inicio = nova_data_hora
+    consulta.data_hora_fim = nova_data_hora_fim
     db.commit()
     db.refresh(consulta)
     

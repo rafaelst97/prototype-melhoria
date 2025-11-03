@@ -162,8 +162,8 @@ class Consulta(Base):
     """
     Entidade: CONSULTA
     - id_consulta (PK)
-    - data_hora
-    - tipo
+    - data_hora_inicio
+    - data_hora_fim
     - status
     - id_paciente_fk (FK)
     - id_medico_fk (FK)
@@ -171,8 +171,8 @@ class Consulta(Base):
     __tablename__ = "consulta"
     
     id_consulta = Column(Integer, primary_key=True, index=True)
-    data_hora = Column(DateTime, nullable=False)
-    tipo = Column(String(50), default="Consulta")
+    data_hora_inicio = Column(DateTime, nullable=False)
+    data_hora_fim = Column(DateTime, nullable=True)
     status = Column(String(50), default="Agendada")
     id_paciente_fk = Column(Integer, ForeignKey("paciente.id_paciente"), nullable=False)
     id_medico_fk = Column(Integer, ForeignKey("medico.id_medico"), nullable=False)

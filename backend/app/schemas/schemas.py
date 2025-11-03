@@ -266,11 +266,13 @@ class ConsultaReagendar(BaseModel):
 
 class ConsultaResponse(BaseModel):
     id_consulta: int
-    data_hora: datetime
-    tipo: str
+    data_hora_inicio: datetime
+    data_hora_fim: Optional[datetime] = None
     status: str
     id_paciente_fk: int
     id_medico_fk: int
+    medico: Optional['MedicoResponse'] = None
+    paciente: Optional['PacienteResponse'] = None
     
     class Config:
         from_attributes = True
@@ -350,4 +352,8 @@ class HorariosDisponiveisResponse(BaseModel):
 
 class MensagemResponse(BaseModel):
     mensagem: str
-    sucesso: bool = True
+
+# Resolver referências forward (circular references)
+ConsultaResponse.model_rebuild()
+MedicoResponse.model_rebuild()
+PacienteResponse.model_rebuild()
