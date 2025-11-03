@@ -1,12 +1,11 @@
+"""
+Schemas Pydantic para validação de entrada/saída da API
+Atualizado para refletir o modelo de dados conforme MER_Estrutura.txt
+"""
 from pydantic import BaseModel, EmailStr, Field, validator
 from datetime import datetime, date, time
 from typing import Optional, List
 from enum import Enum
-
-class TipoUsuario(str, Enum):
-    PACIENTE = "paciente"
-    MEDICO = "medico"
-    ADMIN = "admin"
 
 class StatusConsulta(str, Enum):
     AGENDADA = "agendada"
@@ -19,6 +18,8 @@ class StatusConsulta(str, Enum):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user_type: str  # 'paciente', 'medico', 'administrador'
+    user_id: int
 
 class TokenData(BaseModel):
     email: Optional[str] = None
@@ -27,217 +28,249 @@ class LoginRequest(BaseModel):
     email: EmailStr
     senha: str
 
-# ============ Usuario Schemas ============
-class UsuarioBase(BaseModel):
-    email: EmailStr
-    nome: str
-
-class UsuarioCreate(UsuarioBase):
-    senha: str
-    tipo: TipoUsuario
-
-class UsuarioResponse(UsuarioBase):
-    id: int
-    tipo: TipoUsuario
-    ativo: bool
-    bloqueado: bool
-    criado_em: datetime
+class AlterarSenhaRequest(BaseModel):
+    senha_atual: str
+    senha_nova: str
     
-    class Config:
-        from_attributes = True
+    @validator('senha_nova')
+    def validar_senha_alfanumerica(cls, v):
+        """Valida senha alfanumérica de 8-20 caracteres"""
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError('Senha deve ter entre 8 e 20 caracteres')
+        
+        tem_letra = any(c.isalpha() for c in v)
+        tem_numero = any(c.isdigit() for c in v)
+        
+        if not (tem_letra and tem_numero):
+            raise ValueError('Senha deve conter letras e números (alfanumérica)')
+        
+        return v
 
 # ============ Especialidade Schemas ============
 class EspecialidadeBase(BaseModel):
     nome: str
-    descricao: Optional[str] = None
 
 class EspecialidadeCreate(EspecialidadeBase):
     pass
 
 class EspecialidadeResponse(EspecialidadeBase):
-    id: int
-    ativo: bool
+    id_especialidade: int
     
     class Config:
         from_attributes = True
 
-# ============ Convenio Schemas ============
-class ConvenioBase(BaseModel):
+# ============ PlanoSaude Schemas ============
+class PlanoSaudeBase(BaseModel):
     nome: str
-    codigo: Optional[str] = None
-    telefone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    descricao: Optional[str] = None
+    cobertura_info: Optional[str] = None
 
-class ConvenioCreate(ConvenioBase):
-    codigo: str  # Obrigatório na criação
+class PlanoSaudeCreate(PlanoSaudeBase):
+    pass
 
-class ConvenioUpdate(BaseModel):
+class PlanoSaudeUpdate(BaseModel):
     nome: Optional[str] = None
-    codigo: Optional[str] = None
-    telefone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    descricao: Optional[str] = None
-    ativo: Optional[bool] = None
+    cobertura_info: Optional[str] = None
 
-class ConvenioResponse(ConvenioBase):
-    id: int
-    ativo: bool
-    criado_em: datetime
+class PlanoSaudeResponse(PlanoSaudeBase):
+    id_plano_saude: int
     
     class Config:
         from_attributes = True
 
-# ============ Paciente Schemas ============
-class PacienteBase(BaseModel):
-    cpf: str
-    data_nascimento: date
-    telefone: Optional[str] = None
-    endereco: Optional[str] = None
-    cidade: Optional[str] = None
-    estado: Optional[str] = None
-    cep: Optional[str] = None
-    convenio_id: Optional[int] = None
-    numero_carteirinha: Optional[str] = None
+# ============ Administrador Schemas ============
+class AdministradorBase(BaseModel):
+    nome: str
+    email: EmailStr
+    papel: Optional[str] = None
 
-class PacienteCreate(BaseModel):
-    # Dados do usuário
+class AdministradorCreate(BaseModel):
+    nome: str
     email: EmailStr
     senha: str
-    nome: str
-    # Dados do paciente
-    cpf: str
-    data_nascimento: date
-    telefone: Optional[str] = None
-    endereco: Optional[str] = None
-    cidade: Optional[str] = None
-    estado: Optional[str] = None
-    cep: Optional[str] = None
-    convenio_id: Optional[int] = None
-    numero_carteirinha: Optional[str] = None
+    papel: Optional[str] = None
+    
+    @validator('senha')
+    def validar_senha_alfanumerica(cls, v):
+        """Valida senha alfanumérica de 8-20 caracteres"""
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError('Senha deve ter entre 8 e 20 caracteres')
+        
+        tem_letra = any(c.isalpha() for c in v)
+        tem_numero = any(c.isdigit() for c in v)
+        
+        if not (tem_letra and tem_numero):
+            raise ValueError('Senha deve conter letras e números (alfanumérica)')
+        
+        return v
 
-class PacienteUpdate(BaseModel):
-    nome: Optional[str] = None
-    telefone: Optional[str] = None
-    endereco: Optional[str] = None
-    cidade: Optional[str] = None
-    estado: Optional[str] = None
-    cep: Optional[str] = None
-    convenio_id: Optional[int] = None
-    numero_carteirinha: Optional[str] = None
-
-class PacienteResponse(PacienteBase):
-    id: int
-    usuario_id: int
-    usuario: UsuarioResponse
-    convenio: Optional[ConvenioResponse] = None
+class AdministradorResponse(AdministradorBase):
+    id_admin: int
     
     class Config:
         from_attributes = True
 
 # ============ Medico Schemas ============
 class MedicoBase(BaseModel):
+    nome: str
+    cpf: str
+    email: EmailStr
     crm: str
-    especialidade_id: int
-    telefone: Optional[str] = None
-    valor_consulta: Optional[float] = None
-    tempo_consulta: int = 30
+    id_especialidade_fk: int
 
 class MedicoCreate(BaseModel):
-    # Dados do usuário
+    nome: str
+    cpf: str
     email: EmailStr
     senha: str
-    nome: str
-    # Dados do médico
     crm: str
-    especialidade_id: int
-    telefone: Optional[str] = None
-    valor_consulta: Optional[float] = None
-    tempo_consulta: int = 30
+    id_especialidade_fk: int
+    
+    @validator('senha')
+    def validar_senha_alfanumerica(cls, v):
+        """Valida senha alfanumérica de 8-20 caracteres"""
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError('Senha deve ter entre 8 e 20 caracteres')
+        
+        tem_letra = any(c.isalpha() for c in v)
+        tem_numero = any(c.isdigit() for c in v)
+        
+        if not (tem_letra and tem_numero):
+            raise ValueError('Senha deve conter letras e números (alfanumérica)')
+        
+        return v
+    
+    @validator('cpf')
+    def validar_cpf_formato(cls, v):
+        """Valida formato do CPF"""
+        if v:
+            cpf_limpo = v.replace('.', '').replace('-', '').replace(' ', '')
+            if len(cpf_limpo) != 11 or not cpf_limpo.isdigit():
+                raise ValueError('CPF deve conter 11 dígitos')
+        return v
 
 class MedicoUpdate(BaseModel):
     nome: Optional[str] = None
-    especialidade_id: Optional[int] = None
-    telefone: Optional[str] = None
-    valor_consulta: Optional[float] = None
-    tempo_consulta: Optional[int] = None
+    id_especialidade_fk: Optional[int] = None
 
-class MedicoResponse(MedicoBase):
-    id: int
-    usuario_id: int
-    usuario: UsuarioResponse
-    especialidade: EspecialidadeResponse
+class MedicoResponse(BaseModel):
+    id_medico: int
+    nome: str
+    cpf: str
+    email: str
+    crm: str
+    id_especialidade_fk: int
+    especialidade: Optional[EspecialidadeResponse] = None
     
     class Config:
         from_attributes = True
 
-# ============ Horario Disponivel Schemas ============
-class HorarioDisponivelBase(BaseModel):
+# ============ Paciente Schemas ============
+class PacienteBase(BaseModel):
+    nome: str
+    cpf: str
+    email: EmailStr
+    telefone: Optional[str] = None
+    data_nascimento: date
+    id_plano_saude_fk: Optional[int] = None
+
+class PacienteCreate(BaseModel):
+    nome: str
+    cpf: str
+    email: EmailStr
+    senha: str
+    telefone: Optional[str] = None
+    data_nascimento: date
+    id_plano_saude_fk: Optional[int] = None
+    
+    @validator('senha')
+    def validar_senha_alfanumerica(cls, v):
+        """Valida senha alfanumérica de 8-20 caracteres"""
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError('Senha deve ter entre 8 e 20 caracteres')
+        
+        tem_letra = any(c.isalpha() for c in v)
+        tem_numero = any(c.isdigit() for c in v)
+        
+        if not (tem_letra and tem_numero):
+            raise ValueError('Senha deve conter letras e números (alfanumérica)')
+        
+        return v
+    
+    @validator('cpf')
+    def validar_cpf_formato(cls, v):
+        """Valida formato do CPF"""
+        if v:
+            cpf_limpo = v.replace('.', '').replace('-', '').replace(' ', '')
+            if len(cpf_limpo) != 11 or not cpf_limpo.isdigit():
+                raise ValueError('CPF deve conter 11 dígitos')
+        return v
+
+class PacienteUpdate(BaseModel):
+    nome: Optional[str] = None
+    telefone: Optional[str] = None
+    id_plano_saude_fk: Optional[int] = None
+
+class PacienteResponse(BaseModel):
+    id_paciente: int
+    nome: str
+    cpf: str
+    email: str
+    telefone: Optional[str] = None
+    data_nascimento: date
+    esta_bloqueado: bool
+    id_plano_saude_fk: Optional[int] = None
+    plano_saude: Optional[PlanoSaudeResponse] = None
+    
+    class Config:
+        from_attributes = True
+
+# ============ HorarioTrabalho Schemas ============
+class HorarioTrabalhoBase(BaseModel):
     dia_semana: int = Field(..., ge=0, le=6)
     hora_inicio: time
     hora_fim: time
 
-class HorarioDisponivelCreate(HorarioDisponivelBase):
-    pass  # medico_id é obtido do token JWT, não enviado no body
+class HorarioTrabalhoCreate(HorarioTrabalhoBase):
+    id_medico_fk: Optional[int] = None  # Pode ser obtido do token JWT
 
-class HorariosMultiplosCreate(BaseModel):
-    horarios: List[HorarioDisponivelCreate]
+class HorarioTrabalhoMultiplosCreate(BaseModel):
+    horarios: List[HorarioTrabalhoBase]
 
-class HorarioDisponivelResponse(HorarioDisponivelBase):
-    id: int
-    medico_id: int
-    ativo: bool
-    
-    class Config:
-        from_attributes = True
-
-# ============ Bloqueio Horario Schemas ============
-class BloqueioHorarioBase(BaseModel):
-    data: date
-    hora_inicio: time
-    hora_fim: time
-    motivo: Optional[str] = None
-
-class BloqueioHorarioCreate(BloqueioHorarioBase):
-    medico_id: int
-
-class BloqueioHorarioResponse(BloqueioHorarioBase):
-    id: int
-    medico_id: int
+class HorarioTrabalhoResponse(HorarioTrabalhoBase):
+    id_horario: int
+    id_medico_fk: int
     
     class Config:
         from_attributes = True
 
 # ============ Consulta Schemas ============
 class ConsultaBase(BaseModel):
-    data: date
-    hora: time
-    motivo_consulta: Optional[str] = None
+    data_hora_inicio: datetime
+    data_hora_fim: datetime
+    id_paciente_fk: int
+    id_medico_fk: int
 
-class ConsultaCreate(ConsultaBase):
-    medico_id: int
+class ConsultaCreate(BaseModel):
+    data_hora: datetime
+    id_medico: int
+    tipo: str = "Consulta"
 
 class ConsultaUpdate(BaseModel):
-    status: Optional[StatusConsulta] = None
+    nova_data_hora: datetime
 
 class ConsultaCancelar(BaseModel):
     motivo_cancelamento: Optional[str] = None
 
-class ConsultaResponse(ConsultaBase):
-    id: int
-    paciente_id: int
-    medico_id: int
-    status: StatusConsulta
-    criado_em: datetime
-    cancelado_em: Optional[datetime] = None
-    motivo_cancelamento: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+class ConsultaReagendar(BaseModel):
+    nova_data_hora_inicio: datetime
 
-class ConsultaDetalhada(ConsultaResponse):
-    paciente: PacienteResponse
-    medico: MedicoResponse
+class ConsultaResponse(BaseModel):
+    id_consulta: int
+    data_hora: datetime
+    tipo: str
+    status: str
+    id_paciente_fk: int
+    id_medico_fk: int
     
     class Config:
         from_attributes = True
@@ -247,53 +280,36 @@ class ObservacaoBase(BaseModel):
     descricao: str
 
 class ObservacaoCreate(ObservacaoBase):
-    consulta_id: int
+    id_consulta_fk: int
 
 class ObservacaoUpdate(ObservacaoBase):
     pass
 
 class ObservacaoResponse(ObservacaoBase):
-    id: int
-    consulta_id: int
+    id_observacao: int
+    id_consulta_fk: int
     data_criacao: datetime
     
     class Config:
         from_attributes = True
 
-# ============ Admin Schemas ============
-class AdminCreate(BaseModel):
-    email: EmailStr
-    senha: str
-    nome: str
-    cargo: Optional[str] = None
-
-class AdminResponse(BaseModel):
-    id: int
-    usuario_id: int
-    cargo: Optional[str] = None
-    usuario: UsuarioResponse
-    
-    class Config:
-        from_attributes = True
-
-# ============ Relatorios Schemas ============
+# ============ Relatorio Schemas ============
 class RelatorioBase(BaseModel):
     tipo: str
-    parametros: Optional[str] = None
 
 class RelatorioCreate(RelatorioBase):
     pass
 
 class RelatorioResponse(RelatorioBase):
-    id: int
-    admin_id: int
+    id_relatorio: int
     data_geracao: datetime
     dados_resultado: Optional[str] = None
-    arquivo_path: Optional[str] = None
+    id_admin_fk: int
     
     class Config:
         from_attributes = True
 
+# ============ Schemas para Relatórios Específicos ============
 class RelatorioConsultasPorMedico(BaseModel):
     medico_nome: str
     especialidade: str
@@ -310,13 +326,12 @@ class RelatorioCancelamentos(BaseModel):
     total_consultas: int
     total_cancelamentos: int
     taxa_cancelamento: float
-    total_remarcacoes: int
 
 class RelatorioPacientesFrequentes(BaseModel):
     paciente_nome: str
     cpf: str
     total_consultas: int
-    ultima_consulta: Optional[date] = None
+    ultima_consulta: Optional[datetime] = None
 
 class EstatisticasDashboard(BaseModel):
     total_pacientes: int
@@ -328,6 +343,11 @@ class EstatisticasDashboard(BaseModel):
     consultas_agendadas: int
     consultas_realizadas: int
 
-class HorarioDisponivel(BaseModel):
+# ============ Schemas Auxiliares ============
+class HorariosDisponiveisResponse(BaseModel):
     data: date
-    horarios: List[str]
+    horarios_disponiveis: List[str]
+
+class MensagemResponse(BaseModel):
+    mensagem: str
+    sucesso: bool = True

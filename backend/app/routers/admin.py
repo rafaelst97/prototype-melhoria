@@ -1,23 +1,30 @@
+"""
+Router de Administração - Sistema Clínica Saúde+
+Implementa todos os casos de uso do módulo Administrativo conforme CasosDeUso.txt
+Atualizado para modelo conforme MER
+REFATORADO PARA JWT AUTHENTICATION
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, and_, desc
 from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
+from typing import List
 from datetime import date, datetime, timedelta
 from app.database import get_db
-from app.models import (
-    Usuario, Medico, Paciente, Admin, Consulta, Convenio, Especialidade,
-    TipoUsuario, StatusConsulta, Relatorio as RelatorioModel, Observacao
+from app.utils.auth import get_current_user, get_password_hash
+from app.models.models import (
+    Administrador, Medico, Paciente, Consulta, PlanoSaude, Especialidade,
+    Relatorio, Observacao
 )
-from app.schemas import (
+from app.schemas.schemas import (
+    AdministradorCreate, AdministradorResponse,
     MedicoCreate, MedicoUpdate, MedicoResponse,
     PacienteResponse,
-    ConvenioCreate, ConvenioUpdate, ConvenioResponse,
+    PlanoSaudeCreate, PlanoSaudeUpdate, PlanoSaudeResponse,
     EspecialidadeCreate, EspecialidadeResponse,
-    AdminCreate, AdminResponse,
     EstatisticasDashboard,
-    ConsultaDetalhada,
+    ConsultaResponse,
     RelatorioResponse,
     RelatorioConsultasPorMedico,
     RelatorioConsultasPorEspecialidade,
@@ -25,52 +32,63 @@ from app.schemas import (
     RelatorioPacientesFrequentes,
     ObservacaoResponse
 )
-from app.utils.auth import get_password_hash
-from app.utils.dependencies import get_current_admin
-from app.utils.relatorios import (
-    gerar_relatorio_consultas_por_medico,
-    gerar_relatorio_consultas_por_especialidade,
-    gerar_relatorio_cancelamentos,
-    gerar_relatorio_pacientes_frequentes,
-    criar_pdf_relatorio
-)
-import json
+from app.services.regras_negocio import RegraPaciente
 
 router = APIRouter(prefix="/admin", tags=["Administração"])
 
-# ============ Estatísticas ============
+
+def verificar_admin(current_user: dict):
+    """Helper para verificar se usuário é administrador"""
+    if current_user["tipo"] != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este recurso."
+        )
+
+
+# ============ Dashboard e Estatísticas ============
+
 @router.get("/dashboard", response_model=EstatisticasDashboard)
 def get_dashboard(
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retorna estatísticas do dashboard"""
+    """
+    Retorna estatísticas gerais para o dashboard administrativo
+    """
+    verificar_admin(current_user)
+    
     hoje = date.today()
     inicio_semana = hoje - timedelta(days=hoje.weekday())
     inicio_mes = date(hoje.year, hoje.month, 1)
     
+    # Estatísticas gerais
     total_pacientes = db.query(Paciente).count()
     total_medicos = db.query(Medico).count()
     total_consultas = db.query(Consulta).count()
     
-    consultas_hoje = db.query(Consulta).filter(Consulta.data == hoje).count()
+    # Consultas por período
+    consultas_hoje = db.query(Consulta).filter(
+        func.date(Consulta.data_hora) == hoje
+    ).count()
     
     consultas_semana = db.query(Consulta).filter(
-        Consulta.data >= inicio_semana,
-        Consulta.data <= hoje
+        func.date(Consulta.data_hora) >= inicio_semana,
+        func.date(Consulta.data_hora) <= hoje
     ).count()
     
     consultas_mes = db.query(Consulta).filter(
-        Consulta.data >= inicio_mes,
-        Consulta.data <= hoje
+        func.date(Consulta.data_hora) >= inicio_mes,
+        func.date(Consulta.data_hora) <= hoje
     ).count()
     
+    # Consultas por status
     consultas_agendadas = db.query(Consulta).filter(
-        Consulta.status == StatusConsulta.AGENDADA
+        Consulta.status == "Agendada"
     ).count()
     
     consultas_realizadas = db.query(Consulta).filter(
-        Consulta.status == StatusConsulta.REALIZADA
+        Consulta.status == "Realizada"
     ).count()
     
     return {
@@ -84,76 +102,108 @@ def get_dashboard(
         "consultas_realizadas": consultas_realizadas
     }
 
-# ============ Médicos ============
+
+# ============ Gerenciamento de Médicos ============
+
 @router.get("/medicos", response_model=List[MedicoResponse])
 def listar_medicos(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lista todos os médicos"""
-    medicos = db.query(Medico).offset(skip).limit(limit).all()
+    """
+    Caso de Uso: Gerenciar Cadastro de Médicos (listar)
+    Lista todos os médicos cadastrados
+    """
+    verificar_admin(current_user)
+    
+    medicos = db.query(Medico).options(
+        joinedload(Medico.especialidade)
+    ).all()
+    
     return medicos
+
 
 @router.get("/medicos/{medico_id}", response_model=MedicoResponse)
 def get_medico(
     medico_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retorna dados de um médico específico"""
-    medico = db.query(Medico).filter(Medico.id == medico_id).first()
+    """
+    Retorna dados detalhados de um médico específico
+    """
+    verificar_admin(current_user)
+    
+    medico = db.query(Medico).options(
+        joinedload(Medico.especialidade)
+    ).filter(Medico.id_medico == medico_id).first()
+    
     if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
     return medico
+
 
 @router.post("/medicos", response_model=MedicoResponse, status_code=status.HTTP_201_CREATED)
 def criar_medico(
     medico_data: MedicoCreate,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Cadastra novo médico"""
+    """
+    Caso de Uso: Gerenciar Cadastro de Médicos (criar)
+    Cadastra novo médico (nome, CRM, especialidade)
+    """
+    verificar_admin(current_user)
+    
     # Verificar se email já existe
-    if db.query(Usuario).filter(Usuario.email == medico_data.email).first():
+    email_existe = db.query(Medico).filter(Medico.email == medico_data.email).first()
+    if email_existe:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email já cadastrado no sistema"
         )
     
+    # Verificar se CPF já existe
+    cpf_existe = db.query(Medico).filter(Medico.cpf == medico_data.cpf).first()
+    if cpf_existe:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="CPF já cadastrado no sistema"
+        )
+    
     # Verificar se CRM já existe
-    if db.query(Medico).filter(Medico.crm == medico_data.crm).first():
+    crm_existe = db.query(Medico).filter(Medico.crm == medico_data.crm).first()
+    if crm_existe:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="CRM já cadastrado no sistema"
         )
     
     # Verificar se especialidade existe
-    especialidade = db.query(Especialidade).filter(Especialidade.id == medico_data.especialidade_id).first()
+    especialidade = db.query(Especialidade).filter(
+        Especialidade.id_especialidade == medico_data.id_especialidade_fk
+    ).first()
     if not especialidade:
-        raise HTTPException(status_code=404, detail="Especialidade não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Especialidade não encontrada"
+        )
     
     try:
-        # Criar usuário
-        novo_usuario = Usuario(
-            email=medico_data.email,
-            senha_hash=get_password_hash(medico_data.senha),
-            nome=medico_data.nome,
-            tipo=TipoUsuario.MEDICO
-        )
-        db.add(novo_usuario)
-        db.flush()
-        
         # Criar médico
         novo_medico = Medico(
-            usuario_id=novo_usuario.id,
+            nome=medico_data.nome,
+            cpf=medico_data.cpf,
+            email=medico_data.email,
+            senha_hash=get_password_hash(medico_data.senha),
             crm=medico_data.crm,
-            especialidade_id=medico_data.especialidade_id,
-            telefone=medico_data.telefone,
-            valor_consulta=medico_data.valor_consulta,
-            tempo_consulta=medico_data.tempo_consulta
+            id_especialidade_fk=medico_data.id_especialidade_fk
         )
+        
         db.add(novo_medico)
         db.commit()
         db.refresh(novo_medico)
@@ -162,657 +212,565 @@ def criar_medico(
     
     except IntegrityError as e:
         db.rollback()
-        error_msg = str(e.orig).lower()
-        
-        if 'email' in error_msg or 'usuario_email_key' in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email já cadastrado no sistema"
-            )
-        elif 'crm' in error_msg or 'medico_crm_key' in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="CRM já cadastrado no sistema"
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Erro ao cadastrar médico: dados inválidos ou duplicados"
-            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Erro ao cadastrar médico: dados inválidos ou duplicados"
+        )
+
 
 @router.put("/medicos/{medico_id}", response_model=MedicoResponse)
 def atualizar_medico(
     medico_id: int,
     medico_data: MedicoUpdate,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Atualiza dados do médico"""
-    medico = db.query(Medico).filter(Medico.id == medico_id).first()
+    """
+    Caso de Uso: Gerenciar Cadastro de Médicos (editar)
+    Atualiza dados do médico
+    """
+    verificar_admin(current_user)
+    
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    
     if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
     
-    # Atualizar usuário
-    if medico_data.nome:
-        medico.usuario.nome = medico_data.nome
+    # Atualizar campos fornecidos
+    if medico_data.nome is not None:
+        medico.nome = medico_data.nome
     
-    # Atualizar médico
-    for field, value in medico_data.dict(exclude_unset=True).items():
-        if field != "nome" and value is not None:
-            setattr(medico, field, value)
+    if medico_data.id_especialidade_fk is not None:
+        # Verificar se especialidade existe
+        especialidade = db.query(Especialidade).filter(
+            Especialidade.id_especialidade == medico_data.id_especialidade_fk
+        ).first()
+        if not especialidade:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Especialidade não encontrada"
+            )
+        medico.id_especialidade_fk = medico_data.id_especialidade_fk
     
     db.commit()
     db.refresh(medico)
+    
     return medico
 
-@router.delete("/medicos/{medico_id}")
-def deletar_medico(
+
+@router.delete("/medicos/{medico_id}", status_code=status.HTTP_200_OK)
+def excluir_medico(
     medico_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Desativa um médico"""
-    medico = db.query(Medico).filter(Medico.id == medico_id).first()
+    """
+    Exclui médico do sistema
+    Caso de Uso: Gerenciar Cadastro de Médicos (excluir)
+    """
+    verificar_admin(current_user)
+    
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    
     if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
     
-    # Verificar se tem consultas futuras
-    consultas_futuras = db.query(Consulta).filter(
-        Consulta.medico_id == medico_id,
-        Consulta.data >= date.today(),
-        Consulta.status.in_([StatusConsulta.AGENDADA, StatusConsulta.CONFIRMADA])
-    ).count()
-    
-    if consultas_futuras > 0:
+    # Verificar se médico tem consultas
+    tem_consultas = db.query(Consulta).filter(Consulta.id_medico_fk == medico_id).first()
+    if tem_consultas:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Médico possui {consultas_futuras} consultas futuras agendadas"
+            detail="Não é possível excluir médico com consultas cadastradas"
         )
     
-    medico.usuario.ativo = False
+    db.delete(medico)
     db.commit()
     
-    return {"message": "Médico desativado com sucesso"}
+    return {
+        "sucesso": True,
+        "mensagem": "Médico excluído com sucesso"
+    }
 
-@router.put("/medicos/{medico_id}/ativar")
-def ativar_medico(
-    medico_id: int,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Reativa um médico"""
-    medico = db.query(Medico).filter(Medico.id == medico_id).first()
-    if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
-    
-    medico.usuario.ativo = True
-    db.commit()
-    
-    return {"message": "Médico reativado com sucesso"}
 
-# ============ Pacientes ============
-@router.get("/pacientes")
+# ============ Gerenciamento de Pacientes ============
+
+@router.get("/pacientes", response_model=List[PacienteResponse])
 def listar_pacientes(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lista todos os pacientes com informações adicionais"""
-    pacientes = db.query(Paciente).offset(skip).limit(limit).all()
+    """
+    Lista todos os pacientes cadastrados
+    """
+    verificar_admin(current_user)
     
-    # Enriquecer dados com total de consultas e faltas
-    resultado = []
-    for paciente in pacientes:
-        # Contar total de consultas
-        total_consultas = db.query(Consulta).filter(
-            Consulta.paciente_id == paciente.id
-        ).count()
-        
-        # Contar faltas (status FALTOU)
-        faltas = db.query(Consulta).filter(
-            Consulta.paciente_id == paciente.id,
-            Consulta.status == StatusConsulta.FALTOU
-        ).count()
-        
-        # Serializar paciente
-        paciente_dict = {
-            "id": paciente.id,
-            "usuario_id": paciente.usuario_id,
-            "cpf": paciente.cpf,
-            "data_nascimento": paciente.data_nascimento.isoformat() if paciente.data_nascimento else None,
-            "convenio_id": paciente.convenio_id,
-            "numero_carteirinha": paciente.numero_carteirinha,
-            "faltas_consecutivas": paciente.faltas_consecutivas,
-            "total_consultas": total_consultas,
-            "faltas": faltas,
-            "bloqueado": paciente.usuario.bloqueado if paciente.usuario else False,
-            "usuario": {
-                "id": paciente.usuario.id,
-                "nome": paciente.usuario.nome,
-                "email": paciente.usuario.email,
-                "telefone": paciente.telefone,  # telefone está em Paciente
-                "endereco": paciente.endereco,  # endereco está em Paciente
-                "cidade": paciente.cidade,      # cidade está em Paciente
-                "estado": paciente.estado,      # estado está em Paciente
-                "cep": paciente.cep,            # cep está em Paciente
-                "ativo": paciente.usuario.ativo,
-                "bloqueado": paciente.usuario.bloqueado,
-                "tipo": paciente.usuario.tipo.value,
-            } if paciente.usuario else None,
-            "convenio": {
-                "id": paciente.convenio.id,
-                "nome": paciente.convenio.nome,
-                "ativo": paciente.convenio.ativo,
-            } if paciente.convenio else None
-        }
-        resultado.append(paciente_dict)
+    pacientes = db.query(Paciente).options(
+        joinedload(Paciente.plano_saude)
+    ).all()
     
-    return resultado
+    return pacientes
 
-@router.get("/pacientes/{paciente_id}")
+
+@router.get("/pacientes/{paciente_id}", response_model=PacienteResponse)
 def get_paciente(
     paciente_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retorna dados detalhados de um paciente específico"""
-    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
+    """
+    Retorna dados detalhados de um paciente
+    """
+    verificar_admin(current_user)
+    
+    paciente = db.query(Paciente).options(
+        joinedload(Paciente.plano_saude)
+    ).filter(Paciente.id_paciente == paciente_id).first()
+    
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente não encontrado"
+        )
     
-    # Contar total de consultas
-    total_consultas = db.query(Consulta).filter(
-        Consulta.paciente_id == paciente.id
-    ).count()
-    
-    # Contar faltas
-    faltas = db.query(Consulta).filter(
-        Consulta.paciente_id == paciente.id,
-        Consulta.status == StatusConsulta.FALTOU
-    ).count()
-    
-    # Serializar paciente com dados adicionais
-    paciente_dict = {
-        "id": paciente.id,
-        "usuario_id": paciente.usuario_id,
-        "cpf": paciente.cpf,
-        "data_nascimento": paciente.data_nascimento.isoformat() if paciente.data_nascimento else None,
-        "convenio_id": paciente.convenio_id,
-        "numero_carteirinha": paciente.numero_carteirinha,
-        "faltas_consecutivas": paciente.faltas_consecutivas,
-        "total_consultas": total_consultas,
-        "faltas": faltas,
-        "bloqueado": paciente.usuario.bloqueado if paciente.usuario else False,
-        "usuario": {
-            "id": paciente.usuario.id,
-            "nome": paciente.usuario.nome,
-            "email": paciente.usuario.email,
-            "telefone": paciente.telefone,  # telefone está em Paciente
-            "endereco": paciente.endereco,  # endereco está em Paciente
-            "cidade": paciente.cidade,      # cidade está em Paciente
-            "estado": paciente.estado,      # estado está em Paciente
-            "cep": paciente.cep,            # cep está em Paciente
-            "ativo": paciente.usuario.ativo,
-            "bloqueado": paciente.usuario.bloqueado,
-            "tipo": paciente.usuario.tipo.value,
-        } if paciente.usuario else None,
-        "convenio": {
-            "id": paciente.convenio.id,
-            "nome": paciente.convenio.nome,
-            "ativo": paciente.convenio.ativo,
-        } if paciente.convenio else None
-    }
-    
-    return paciente_dict
+    return paciente
 
-@router.put("/pacientes/{paciente_id}/bloquear")
+
+@router.post("/pacientes/{paciente_id}/bloquear", response_model=PacienteResponse)
 def bloquear_paciente(
     paciente_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Bloqueia um paciente"""
-    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
+    """
+    Bloqueia um paciente
+    """
+    verificar_admin(current_user)
+    
+    paciente = db.query(Paciente).filter(Paciente.id_paciente == paciente_id).first()
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente não encontrado"
+        )
     
-    paciente.usuario.bloqueado = True
+    paciente.esta_bloqueado = True
     db.commit()
+    db.refresh(paciente)
     
-    return {"message": "Paciente bloqueado com sucesso"}
+    return paciente
 
-@router.put("/pacientes/{paciente_id}/desbloquear")
+
+@router.post("/pacientes/{paciente_id}/desbloquear", response_model=PacienteResponse)
 def desbloquear_paciente(
     paciente_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Desbloqueia um paciente
     Caso de Uso: Desbloquear Contas de Pacientes
-    Regra de Negócio: Se o paciente faltar a 3 consultas seguidas sem aviso, 
-    o sistema deve bloquear novos agendamentos até liberação pela administração
+    RN3: Administrador pode desbloquear pacientes bloqueados por 3 faltas consecutivas
     """
-    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
+    verificar_admin(current_user)
+    
+    paciente = db.query(Paciente).filter(Paciente.id_paciente == paciente_id).first()
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente não encontrado"
+        )
     
-    # Desbloquear usuário
-    usuario = db.query(Usuario).filter(Usuario.id == paciente.usuario_id).first()
-    if usuario:
-        usuario.bloqueado = False
-    
-    # Zerar contador de faltas consecutivas
+    paciente.esta_bloqueado = False
     paciente.faltas_consecutivas = 0
-    
     db.commit()
+    db.refresh(paciente)
     
-    return {"message": "Paciente desbloqueado com sucesso"}
-    """Desbloqueia um paciente"""
-    paciente = db.query(Paciente).filter(Paciente.id == paciente_id).first()
-    if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
-    
-    paciente.usuario.bloqueado = False
-    db.commit()
-    
-    return {"message": "Paciente desbloqueado com sucesso"}
+    return paciente
 
-# ============ Convênios ============
-@router.get("/convenios", response_model=List[ConvenioResponse])
-def listar_convenios(
-    current_user: Usuario = Depends(get_current_admin),
+
+# ============ Gerenciamento de Consultas ============
+
+@router.get("/consultas", response_model=List[ConsultaResponse])
+def listar_consultas(
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Lista todos os convênios"""
-    convenios = db.query(Convenio).all()
-    return convenios
+    """
+    Lista todas as consultas do sistema
+    """
+    verificar_admin(current_user)
+    
+    consultas = db.query(Consulta).options(
+        joinedload(Consulta.paciente),
+        joinedload(Consulta.medico).joinedload(Medico.especialidade)
+    ).all()
+    
+    return consultas
 
-@router.post("/convenios", response_model=ConvenioResponse, status_code=status.HTTP_201_CREATED)
-def criar_convenio(
-    convenio_data: ConvenioCreate,
-    current_user: Usuario = Depends(get_current_admin),
+
+# ============ Gerenciamento de Planos de Saúde ============
+
+@router.get("/planos-saude", response_model=List[PlanoSaudeResponse])
+def listar_planos_saude(
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Cadastra novo convênio"""
-    # Verificar se nome já existe
-    if db.query(Convenio).filter(Convenio.nome == convenio_data.nome).first():
+    """
+    Caso de Uso: Gerenciar Planos de Saúde (listar)
+    Lista todos os planos de saúde cadastrados
+    """
+    verificar_admin(current_user)
+    
+    planos = db.query(PlanoSaude).all()
+    return planos
+
+
+@router.post("/planos-saude", response_model=PlanoSaudeResponse, status_code=status.HTTP_201_CREATED)
+def criar_plano_saude(
+    plano_data: PlanoSaudeCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerenciar Planos de Saúde (criar)
+    Cadastra novo plano de saúde
+    """
+    verificar_admin(current_user)
+    
+    # Verificar se já existe plano com este nome
+    plano_existe = db.query(PlanoSaude).filter(PlanoSaude.nome == plano_data.nome).first()
+    if plano_existe:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Convênio com este nome já cadastrado no sistema"
+            detail="Já existe um plano de saúde com este nome"
         )
     
-    # Verificar se código já existe
-    if db.query(Convenio).filter(Convenio.codigo == convenio_data.codigo).first():
+    novo_plano = PlanoSaude(
+        nome=plano_data.nome,
+        cobertura_info=plano_data.cobertura_info
+    )
+    
+    db.add(novo_plano)
+    db.commit()
+    db.refresh(novo_plano)
+    
+    return novo_plano
+
+
+@router.put("/planos-saude/{plano_id}", response_model=PlanoSaudeResponse)
+def atualizar_plano_saude(
+    plano_id: int,
+    plano_data: PlanoSaudeUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerenciar Planos de Saúde (editar)
+    Atualiza dados do plano de saúde
+    """
+    verificar_admin(current_user)
+    
+    plano = db.query(PlanoSaude).filter(PlanoSaude.id_plano_saude == plano_id).first()
+    
+    if not plano:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Convênio com este código já cadastrado no sistema"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plano de saúde não encontrado"
         )
     
-    try:
-        novo_convenio = Convenio(**convenio_data.dict())
-        db.add(novo_convenio)
-        db.commit()
-        db.refresh(novo_convenio)
-        
-        return novo_convenio
-    
-    except IntegrityError as e:
-        db.rollback()
-        error_msg = str(e.orig).lower()
-        
-        if 'nome' in error_msg or 'convenio_nome_key' in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Convênio com este nome já cadastrado no sistema"
-            )
-        elif 'codigo' in error_msg or 'convenio_codigo_key' in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Convênio com este código já cadastrado no sistema"
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Erro ao cadastrar convênio: dados inválidos ou duplicados"
-            )
-
-@router.put("/convenios/{convenio_id}", response_model=ConvenioResponse)
-def atualizar_convenio(
-    convenio_id: int,
-    convenio_data: ConvenioUpdate,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Atualiza convênio"""
-    convenio = db.query(Convenio).filter(Convenio.id == convenio_id).first()
-    if not convenio:
-        raise HTTPException(status_code=404, detail="Convênio não encontrado")
-    
-    for field, value in convenio_data.dict(exclude_unset=True).items():
-        if value is not None:
-            setattr(convenio, field, value)
+    if plano_data.nome is not None:
+        plano.nome = plano_data.nome
+    if plano_data.cobertura_info is not None:
+        plano.cobertura_info = plano_data.cobertura_info
     
     db.commit()
-    db.refresh(convenio)
-    return convenio
+    db.refresh(plano)
+    
+    return plano
 
-@router.delete("/convenios/{convenio_id}")
-def deletar_convenio(
-    convenio_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+
+@router.delete("/planos-saude/{plano_id}", status_code=status.HTTP_200_OK)
+def excluir_plano_saude(
+    plano_id: int,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Desativa um convênio"""
-    convenio = db.query(Convenio).filter(Convenio.id == convenio_id).first()
-    if not convenio:
-        raise HTTPException(status_code=404, detail="Convênio não encontrado")
+    """
+    Exclui plano de saúde
+    """
+    verificar_admin(current_user)
     
-    convenio.ativo = False
+    plano = db.query(PlanoSaude).filter(PlanoSaude.id_plano_saude == plano_id).first()
+    
+    if not plano:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plano de saúde não encontrado"
+        )
+    
+    # Verificar se há pacientes vinculados
+    pacientes_com_plano = db.query(Paciente).filter(
+        Paciente.id_plano_saude_fk == plano_id
+    ).count()
+    
+    if pacientes_com_plano > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Não é possível excluir plano com {pacientes_com_plano} paciente(s) vinculado(s)"
+        )
+    
+    db.delete(plano)
     db.commit()
     
-    return {"message": "Convênio desativado com sucesso"}
+    return {
+        "sucesso": True,
+        "mensagem": "Plano de saúde excluído com sucesso"
+    }
 
-@router.put("/convenios/{convenio_id}/ativar")
-def ativar_convenio(
-    convenio_id: int,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Reativa um convênio"""
-    convenio = db.query(Convenio).filter(Convenio.id == convenio_id).first()
-    if not convenio:
-        raise HTTPException(status_code=404, detail="Convênio não encontrado")
-    
-    convenio.ativo = True
-    db.commit()
-    
-    return {"message": "Convênio reativado com sucesso"}
 
-# ============ Especialidades ============
+# ============ Gerenciamento de Especialidades ============
+
 @router.get("/especialidades", response_model=List[EspecialidadeResponse])
 def listar_especialidades(
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Lista todas as especialidades"""
+    verificar_admin(current_user)
+    
     especialidades = db.query(Especialidade).all()
     return especialidades
+
 
 @router.post("/especialidades", response_model=EspecialidadeResponse, status_code=status.HTTP_201_CREATED)
 def criar_especialidade(
     especialidade_data: EspecialidadeCreate,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Cadastra nova especialidade"""
-    if db.query(Especialidade).filter(Especialidade.nome == especialidade_data.nome).first():
+    """Cadastra nova especialidade médica"""
+    verificar_admin(current_user)
+    
+    # Verificar se já existe
+    existe = db.query(Especialidade).filter(
+        Especialidade.nome == especialidade_data.nome
+    ).first()
+    
+    if existe:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Especialidade já cadastrada"
         )
     
-    nova_especialidade = Especialidade(**especialidade_data.dict())
+    nova_especialidade = Especialidade(nome=especialidade_data.nome)
     db.add(nova_especialidade)
     db.commit()
     db.refresh(nova_especialidade)
     
     return nova_especialidade
 
-# ============ Consultas ============
-@router.get("/consultas", response_model=List[ConsultaDetalhada])
-def listar_consultas(
-    data_inicio: date = None,
-    data_fim: date = None,
-    status_filtro: StatusConsulta = None,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Lista todas as consultas com filtros"""
-    query = db.query(Consulta)
-    
-    if data_inicio:
-        query = query.filter(Consulta.data >= data_inicio)
-    if data_fim:
-        query = query.filter(Consulta.data <= data_fim)
-    if status_filtro:
-        query = query.filter(Consulta.status == status_filtro)
-    
-    consultas = query.order_by(Consulta.data.desc(), Consulta.hora.desc()).limit(100).all()
-    return consultas
 
-# ============ Administradores ============
-@router.post("/admins", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
-def criar_admin(
-    admin_data: AdminCreate,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Cadastra novo administrador"""
-    # Verificar se email já existe
-    if db.query(Usuario).filter(Usuario.email == admin_data.email).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email já cadastrado"
-        )
-    
-    # Criar usuário
-    novo_usuario = Usuario(
-        email=admin_data.email,
-        senha_hash=get_password_hash(admin_data.senha),
-        nome=admin_data.nome,
-        tipo=TipoUsuario.ADMIN
-    )
-    db.add(novo_usuario)
-    db.flush()
-    
-    # Criar admin
-    novo_admin = Admin(
-        usuario_id=novo_usuario.id,
-        cargo=admin_data.cargo
-    )
-    db.add(novo_admin)
-    db.commit()
-    db.refresh(novo_admin)
-    
-    return novo_admin
-
-# ============ Relatórios em PDF ============
-
-@router.get("/relatorios/consultas-por-medico")
-def relatorio_consultas_medico(
-    data_inicio: Optional[date] = None,
-    data_fim: Optional[date] = None,
-    formato: str = "json",
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Gera relatório de consultas por médico
-    Caso de Uso: Gerar Relatórios em PDF - Quantidade de consultas por médico
-    """
-    admin = db.query(Admin).filter(Admin.usuario_id == current_user.id).first()
-    
-    dados_relatorio = gerar_relatorio_consultas_por_medico(db, data_inicio, data_fim)
-    
-    # Salvar no banco de dados
-    novo_relatorio = RelatorioModel(
-        admin_id=admin.id,
-        tipo='consultas_por_medico',
-        parametros=json.dumps({
-            'data_inicio': data_inicio.isoformat() if data_inicio else None,
-            'data_fim': data_fim.isoformat() if data_fim else None
-        }),
-        dados_resultado=json.dumps(dados_relatorio)
-    )
-    db.add(novo_relatorio)
-    db.commit()
-    
-    if formato == "pdf":
-        pdf_buffer = criar_pdf_relatorio(dados_relatorio)
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=relatorio_consultas_medico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
-        )
-    
-    return dados_relatorio
-
-@router.get("/relatorios/consultas-por-especialidade")
-def relatorio_consultas_especialidade(
-    data_inicio: Optional[date] = None,
-    data_fim: Optional[date] = None,
-    formato: str = "json",
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Gera relatório de consultas por especialidade
-    Caso de Uso: Gerar Relatórios em PDF - Quantidade de consultas por especialidade
-    """
-    admin = db.query(Admin).filter(Admin.usuario_id == current_user.id).first()
-    
-    dados_relatorio = gerar_relatorio_consultas_por_especialidade(db, data_inicio, data_fim)
-    
-    # Salvar no banco de dados
-    novo_relatorio = RelatorioModel(
-        admin_id=admin.id,
-        tipo='consultas_por_especialidade',
-        parametros=json.dumps({
-            'data_inicio': data_inicio.isoformat() if data_inicio else None,
-            'data_fim': data_fim.isoformat() if data_fim else None
-        }),
-        dados_resultado=json.dumps(dados_relatorio)
-    )
-    db.add(novo_relatorio)
-    db.commit()
-    
-    if formato == "pdf":
-        pdf_buffer = criar_pdf_relatorio(dados_relatorio)
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=relatorio_consultas_especialidade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
-        )
-    
-    return dados_relatorio
-
-@router.get("/relatorios/cancelamentos")
-def relatorio_cancelamentos(
-    data_inicio: Optional[date] = None,
-    data_fim: Optional[date] = None,
-    formato: str = "json",
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Gera relatório de cancelamentos e remarcações
-    Caso de Uso: Gerar Relatórios em PDF - Taxa de cancelamentos e remarcações
-    """
-    admin = db.query(Admin).filter(Admin.usuario_id == current_user.id).first()
-    
-    dados_relatorio = gerar_relatorio_cancelamentos(db, data_inicio, data_fim)
-    
-    # Salvar no banco de dados
-    novo_relatorio = RelatorioModel(
-        admin_id=admin.id,
-        tipo='cancelamentos_remarcacoes',
-        parametros=json.dumps({
-            'data_inicio': data_inicio.isoformat() if data_inicio else None,
-            'data_fim': data_fim.isoformat() if data_fim else None
-        }),
-        dados_resultado=json.dumps(dados_relatorio)
-    )
-    db.add(novo_relatorio)
-    db.commit()
-    
-    if formato == "pdf":
-        pdf_buffer = criar_pdf_relatorio(dados_relatorio)
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=relatorio_cancelamentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
-        )
-    
-    return dados_relatorio
-
-@router.get("/relatorios/pacientes-frequentes")
-def relatorio_pacientes_frequentes(
-    data_inicio: Optional[date] = None,
-    data_fim: Optional[date] = None,
-    limite: int = 20,
-    formato: str = "json",
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    Gera relatório de pacientes que mais consultaram
-    Caso de Uso: Gerar Relatórios em PDF - Pacientes que mais consultaram no período
-    """
-    admin = db.query(Admin).filter(Admin.usuario_id == current_user.id).first()
-    
-    dados_relatorio = gerar_relatorio_pacientes_frequentes(db, data_inicio, data_fim, limite)
-    
-    # Salvar no banco de dados
-    novo_relatorio = RelatorioModel(
-        admin_id=admin.id,
-        tipo='pacientes_frequentes',
-        parametros=json.dumps({
-            'data_inicio': data_inicio.isoformat() if data_inicio else None,
-            'data_fim': data_fim.isoformat() if data_fim else None,
-            'limite': limite
-        }),
-        dados_resultado=json.dumps(dados_relatorio)
-    )
-    db.add(novo_relatorio)
-    db.commit()
-    
-    if formato == "pdf":
-        pdf_buffer = criar_pdf_relatorio(dados_relatorio)
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=relatorio_pacientes_frequentes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
-        )
-    
-    return dados_relatorio
-
-@router.get("/relatorios/historico", response_model=List[RelatorioResponse])
-def historico_relatorios(
-    skip: int = 0,
-    limit: int = 50,
-    current_user: Usuario = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """Lista histórico de relatórios gerados"""
-    relatorios = db.query(RelatorioModel).order_by(
-        RelatorioModel.data_geracao.desc()
-    ).offset(skip).limit(limit).all()
-    
-    return relatorios
-
-# ============ Observações (Acesso Admin) ============
+# ============ Visualização de Observações ============
 
 @router.get("/observacoes/{consulta_id}", response_model=ObservacaoResponse)
-def get_observacao_consulta(
+def visualizar_observacao(
     consulta_id: int,
-    current_user: Usuario = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Visualiza observação de uma consulta
-    Caso de Uso: Visualizar Observações da Consulta (Admin tem acesso)
+    Caso de Uso: Visualizar Observações da Consulta
+    Administrador pode visualizar observações de qualquer consulta
     """
-    consulta = db.query(Consulta).filter(Consulta.id == consulta_id).first()
-    if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+    verificar_admin(current_user)
     
+    # Verificar se consulta existe
+    consulta = db.query(Consulta).filter(Consulta.id_consulta == consulta_id).first()
+    if not consulta:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Consulta não encontrada"
+        )
+    
+    # Buscar observação
     observacao = db.query(Observacao).filter(
-        Observacao.consulta_id == consulta_id
+        Observacao.id_consulta_fk == consulta_id
     ).first()
     
     if not observacao:
-        raise HTTPException(status_code=404, detail="Observação não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nenhuma observação encontrada para esta consulta"
+        )
     
     return observacao
+
+
+# ============ Relatórios ============
+
+@router.get("/relatorios/consultas-por-medico", response_model=List[RelatorioConsultasPorMedico])
+def relatorio_consultas_por_medico(
+    data_inicio: date = None,
+    data_fim: date = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerar Relatórios em PDF
+    Relatório: Quantidade de consultas por médico
+    """
+    verificar_admin(current_user)
+    
+    query = db.query(
+        Medico.nome.label("medico_nome"),
+        Especialidade.nome.label("especialidade"),
+        func.count(Consulta.id_consulta).label("total_consultas"),
+        func.sum(func.case((Consulta.status == "Realizada", 1), else_=0)).label("consultas_realizadas"),
+        func.sum(func.case((Consulta.status == "Cancelada", 1), else_=0)).label("consultas_canceladas")
+    ).join(
+        Consulta, Consulta.id_medico_fk == Medico.id_medico
+    ).join(
+        Especialidade, Especialidade.id_especialidade == Medico.id_especialidade_fk
+    )
+    
+    if data_inicio:
+        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+    if data_fim:
+        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+    
+    resultados = query.group_by(
+        Medico.id_medico, Medico.nome, Especialidade.nome
+    ).all()
+    
+    return [
+        {
+            "medico_nome": r.medico_nome,
+            "especialidade": r.especialidade,
+            "total_consultas": r.total_consultas,
+            "consultas_realizadas": r.consultas_realizadas or 0,
+            "consultas_canceladas": r.consultas_canceladas or 0
+        }
+        for r in resultados
+    ]
+
+
+@router.get("/relatorios/consultas-por-especialidade", response_model=List[RelatorioConsultasPorEspecialidade])
+def relatorio_consultas_por_especialidade(
+    data_inicio: date = None,
+    data_fim: date = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerar Relatórios em PDF
+    Relatório: Quantidade de consultas por especialidade
+    """
+    verificar_admin(current_user)
+    
+    query = db.query(
+        Especialidade.nome.label("especialidade"),
+        func.count(Consulta.id_consulta).label("total_consultas"),
+        func.count(func.distinct(Medico.id_medico)).label("total_medicos")
+    ).join(
+        Medico, Medico.id_especialidade_fk == Especialidade.id_especialidade
+    ).join(
+        Consulta, Consulta.id_medico_fk == Medico.id_medico
+    )
+    
+    if data_inicio:
+        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+    if data_fim:
+        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+    
+    resultados = query.group_by(Especialidade.id_especialidade, Especialidade.nome).all()
+    
+    return [
+        {
+            "especialidade": r.especialidade,
+            "total_consultas": r.total_consultas,
+            "total_medicos": r.total_medicos
+        }
+        for r in resultados
+    ]
+
+
+@router.get("/relatorios/cancelamentos", response_model=RelatorioCancelamentos)
+def relatorio_cancelamentos(
+    data_inicio: date = None,
+    data_fim: date = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerar Relatórios em PDF
+    Relatório: Taxa de cancelamentos e remarcações
+    """
+    verificar_admin(current_user)
+    
+    query = db.query(Consulta)
+    
+    if data_inicio:
+        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+    if data_fim:
+        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+    
+    total_consultas = query.count()
+    total_cancelamentos = query.filter(Consulta.status == "Cancelada").count()
+    
+    taxa_cancelamento = (total_cancelamentos / total_consultas * 100) if total_consultas > 0 else 0
+    
+    return {
+        "total_consultas": total_consultas,
+        "total_cancelamentos": total_cancelamentos,
+        "taxa_cancelamento": round(taxa_cancelamento, 2)
+    }
+
+
+@router.get("/relatorios/pacientes-frequentes", response_model=List[RelatorioPacientesFrequentes])
+def relatorio_pacientes_frequentes(
+    data_inicio: date = None,
+    data_fim: date = None,
+    limite: int = 10,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerar Relatórios em PDF
+    Relatório: Pacientes que mais consultaram no período
+    """
+    verificar_admin(current_user)
+    
+    query = db.query(
+        Paciente.nome.label("paciente_nome"),
+        Paciente.cpf,
+        func.count(Consulta.id_consulta).label("total_consultas"),
+        func.max(Consulta.data_hora).label("ultima_consulta")
+    ).join(
+        Consulta, Consulta.id_paciente_fk == Paciente.id_paciente
+    )
+    
+    if data_inicio:
+        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+    if data_fim:
+        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+    
+    resultados = query.group_by(
+        Paciente.id_paciente, Paciente.nome, Paciente.cpf
+    ).order_by(
+        desc(func.count(Consulta.id_consulta))
+    ).limit(limite).all()
+    
+    return [
+        {
+            "paciente_nome": r.paciente_nome,
+            "cpf": r.cpf,
+            "total_consultas": r.total_consultas,
+            "ultima_consulta": r.ultima_consulta
+        }
+        for r in resultados
+    ]

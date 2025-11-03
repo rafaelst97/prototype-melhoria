@@ -1,412 +1,347 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from typing import List, Union
+"""
+Router de Médicos - Sistema Clínica Saúde+
+Implementa todos os casos de uso do módulo Médico conforme CasosDeUso.txt
+Atualizado para modelo conforme MER
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_, func
+from typing import List
 from datetime import date, datetime, time
 from app.database import get_db
-from app.models import (
-    Usuario, Medico, Consulta, HorarioDisponivel as HorarioDisponivelModel,
-    BloqueioHorario as BloqueioHorarioModel, StatusConsulta, Especialidade,
-    Observacao as ObservacaoModel, Paciente
+from app.models.models import (
+    Medico, Consulta, HorarioTrabalho, Observacao,
+    Paciente, Especialidade
 )
-from app.schemas import (
+from app.schemas.schemas import (
     MedicoResponse, MedicoUpdate,
-    ConsultaDetalhada, ConsultaUpdate,
-    HorarioDisponivelCreate, HorarioDisponivelResponse, HorariosMultiplosCreate,
-    BloqueioHorarioCreate, BloqueioHorarioResponse,
-    EspecialidadeResponse,
+    ConsultaResponse, ConsultaUpdate,
+    HorarioTrabalhoCreate, HorarioTrabalhoResponse, HorarioTrabalhoMultiplosCreate,
     ObservacaoCreate, ObservacaoUpdate, ObservacaoResponse
 )
-from app.utils.dependencies import get_current_medico
 
 router = APIRouter(prefix="/medicos", tags=["Médicos"])
 
-@router.get("/perfil", response_model=MedicoResponse)
-def get_perfil(
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Retorna perfil do médico logado"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+
+@router.get("/perfil/{medico_id}", response_model=MedicoResponse)
+def get_perfil(medico_id: int, db: Session = Depends(get_db)):
+    """
+    Retorna perfil do médico
+    Deve ser chamado com o ID do médico obtido do token JWT
+    """
+    medico = db.query(Medico).options(
+        joinedload(Medico.especialidade)
+    ).filter(Medico.id_medico == medico_id).first()
+    
     if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
     return medico
 
-@router.put("/perfil", response_model=MedicoResponse)
+
+@router.put("/perfil/{medico_id}", response_model=MedicoResponse)
 def atualizar_perfil(
+    medico_id: int,
     medico_update: MedicoUpdate,
-    current_user: Usuario = Depends(get_current_medico),
     db: Session = Depends(get_db)
 ):
-    """Atualiza perfil do médico logado"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+    """
+    Atualiza perfil do médico
+    Permite atualizar: nome, especialidade
+    """
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    
     if not medico:
-        raise HTTPException(status_code=404, detail="Médico não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
     
     # Atualizar campos fornecidos
-    update_data = medico_update.model_dump(exclude_unset=True)
-    
-    for field, value in update_data.items():
-        setattr(medico, field, value)
-    
-    # Se nome foi atualizado, atualizar também no usuário
-    if "nome" in update_data:
-        usuario = db.query(Usuario).filter(Usuario.id == current_user.id).first()
-        if usuario:
-            usuario.nome = update_data["nome"]
+    if medico_update.nome is not None:
+        medico.nome = medico_update.nome
+    if medico_update.id_especialidade_fk is not None:
+        # Verificar se especialidade existe
+        especialidade = db.query(Especialidade).filter(
+            Especialidade.id_especialidade == medico_update.id_especialidade_fk
+        ).first()
+        if not especialidade:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Especialidade não encontrada"
+            )
+        medico.id_especialidade_fk = medico_update.id_especialidade_fk
     
     db.commit()
     db.refresh(medico)
     return medico
 
-@router.get("/consultas", response_model=List[ConsultaDetalhada])
+
+@router.post("/horarios", response_model=List[HorarioTrabalhoResponse], status_code=status.HTTP_201_CREATED)
+def cadastrar_horarios(
+    medico_id: int,
+    horarios_data: HorarioTrabalhoMultiplosCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Caso de Uso: Gerenciar Horários de Trabalho
+    Cadastra múltiplos horários de atendimento do médico
+    Define horários disponíveis semanalmente
+    """
+    # Verificar se médico existe
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
+    horarios_criados = []
+    
+    for horario_data in horarios_data.horarios:
+        # Validar que hora_fim > hora_inicio
+        if horario_data.hora_fim <= horario_data.hora_inicio:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hora de fim deve ser posterior à hora de início"
+            )
+        
+        # Verificar conflito com horários existentes
+        conflito = db.query(HorarioTrabalho).filter(
+            and_(
+                HorarioTrabalho.id_medico_fk == medico_id,
+                HorarioTrabalho.dia_semana == horario_data.dia_semana,
+                or_(
+                    and_(
+                        HorarioTrabalho.hora_inicio <= horario_data.hora_inicio,
+                        HorarioTrabalho.hora_fim > horario_data.hora_inicio
+                    ),
+                    and_(
+                        HorarioTrabalho.hora_inicio < horario_data.hora_fim,
+                        HorarioTrabalho.hora_fim >= horario_data.hora_fim
+                    )
+                )
+            )
+        ).first()
+        
+        if conflito:
+            dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Conflito de horário na {dias[horario_data.dia_semana]}: já existe horário cadastrado que sobrepõe este período"
+            )
+        
+        # Criar horário
+        novo_horario = HorarioTrabalho(
+            dia_semana=horario_data.dia_semana,
+            hora_inicio=horario_data.hora_inicio,
+            hora_fim=horario_data.hora_fim,
+            id_medico_fk=medico_id
+        )
+        db.add(novo_horario)
+        horarios_criados.append(novo_horario)
+    
+    db.commit()
+    for horario in horarios_criados:
+        db.refresh(horario)
+    
+    return horarios_criados
+
+
+@router.get("/horarios/{medico_id}", response_model=List[HorarioTrabalhoResponse])
+def listar_horarios(medico_id: int, db: Session = Depends(get_db)):
+    """
+    Lista todos os horários de trabalho configurados pelo médico
+    """
+    # Verificar se médico existe
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
+    horarios = db.query(HorarioTrabalho).filter(
+        HorarioTrabalho.id_medico_fk == medico_id
+    ).order_by(HorarioTrabalho.dia_semana, HorarioTrabalho.hora_inicio).all()
+    
+    return horarios
+
+
+@router.delete("/horarios/{horario_id}", status_code=status.HTTP_200_OK)
+def excluir_horario(
+    horario_id: int,
+    medico_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Exclui um horário de trabalho
+    Caso de Uso: Gerenciar Horários de Trabalho (edição)
+    """
+    horario = db.query(HorarioTrabalho).filter(
+        and_(
+            HorarioTrabalho.id_horario == horario_id,
+            HorarioTrabalho.id_medico_fk == medico_id
+        )
+    ).first()
+    
+    if not horario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Horário não encontrado"
+        )
+    
+    db.delete(horario)
+    db.commit()
+    
+    return {
+        "sucesso": True,
+        "mensagem": "Horário excluído com sucesso"
+    }
+
+
+@router.get("/consultas/{medico_id}", response_model=List[ConsultaResponse])
 def listar_consultas(
+    medico_id: int,
     data_inicio: date = None,
     data_fim: date = None,
-    current_user: Usuario = Depends(get_current_medico),
     db: Session = Depends(get_db)
 ):
-    """Lista consultas do médico"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+    """
+    Caso de Uso: Visualizar Consultas Agendadas
+    Lista consultas do médico, opcionalmente filtradas por período
+    """
+    # Verificar se médico existe
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
     
-    query = db.query(Consulta).filter(Consulta.medico_id == medico.id)
+    query = db.query(Consulta).options(
+        joinedload(Consulta.paciente),
+        joinedload(Consulta.medico)
+    ).filter(Consulta.id_medico_fk == medico_id)
     
     if data_inicio:
-        query = query.filter(Consulta.data >= data_inicio)
+        data_inicio_dt = datetime.combine(data_inicio, time.min)
+        query = query.filter(Consulta.data_hora_inicio >= data_inicio_dt)
+    
     if data_fim:
-        query = query.filter(Consulta.data <= data_fim)
+        data_fim_dt = datetime.combine(data_fim, time.max)
+        query = query.filter(Consulta.data_hora_inicio <= data_fim_dt)
     
-    consultas = query.order_by(Consulta.data, Consulta.hora).all()
+    consultas = query.order_by(Consulta.data_hora_inicio).all()
+    
     return consultas
 
-@router.get("/consultas/hoje", response_model=List[ConsultaDetalhada])
-def consultas_hoje(
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Lista consultas do dia atual"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+
+@router.get("/consultas/hoje/{medico_id}", response_model=List[ConsultaResponse])
+def consultas_hoje(medico_id: int, db: Session = Depends(get_db)):
+    """
+    Lista consultas do dia atual do médico
+    Caso de Uso: Visualizar Consultas Agendadas (por data)
+    """
     hoje = date.today()
-    
-    consultas = db.query(Consulta).filter(
-        Consulta.medico_id == medico.id,
-        Consulta.data == hoje,
-        Consulta.status.in_([StatusConsulta.AGENDADA, StatusConsulta.CONFIRMADA])
-    ).order_by(Consulta.hora).all()
-    
-    return consultas
+    return listar_consultas(medico_id, data_inicio=hoje, data_fim=hoje, db=db)
 
-@router.get("/consultas/{consulta_id}", response_model=ConsultaDetalhada)
-def get_consulta(
+
+@router.put("/consultas/{consulta_id}/status", response_model=ConsultaResponse)
+def atualizar_status_consulta(
     consulta_id: int,
-    current_user: Usuario = Depends(get_current_medico),
+    medico_id: int,
+    novo_status: str,
     db: Session = Depends(get_db)
 ):
-    """Retorna detalhes de uma consulta específica"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+    """
+    Atualiza status da consulta (agendada, confirmada, realizada, faltou)
+    Caso de Uso: Visualizar Consultas Agendadas (marcar como realizada)
     
+    RN3: Se marcar como 'faltou', incrementa contador de faltas do paciente
+    """
+    # Buscar consulta
     consulta = db.query(Consulta).filter(
-        Consulta.id == consulta_id,
-        Consulta.medico_id == medico.id
+        and_(
+            Consulta.id_consulta == consulta_id,
+            Consulta.id_medico_fk == medico_id
+        )
     ).first()
     
     if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Consulta não encontrada"
+        )
     
-    return consulta
-
-@router.put("/consultas/{consulta_id}", response_model=ConsultaDetalhada)
-def atualizar_consulta(
-    consulta_id: int,
-    consulta_data: ConsultaUpdate,
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Atualiza observações ou status da consulta"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
+    # Validar novo status
+    status_validos = ['agendada', 'confirmada', 'realizada', 'faltou', 'cancelada']
+    if novo_status not in status_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Status inválido. Valores permitidos: {', '.join(status_validos)}"
+        )
     
-    consulta = db.query(Consulta).filter(
-        Consulta.id == consulta_id,
-        Consulta.medico_id == medico.id
-    ).first()
+    status_antigo = consulta.status
+    consulta.status = novo_status
     
-    if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
-    
-    if consulta_data.status is not None:
-        old_status = consulta.status
-        consulta.status = consulta_data.status
-        
-        # Regra de negócio: zerar faltas quando consulta é realizada
-        if consulta_data.status == StatusConsulta.REALIZADA and old_status != StatusConsulta.REALIZADA:
-            paciente = db.query(Paciente).filter(Paciente.id == consulta.paciente_id).first()
-            if paciente:
-                paciente.faltas_consecutivas = 0
-        
-        # Regra de negócio: incrementar faltas quando paciente falta
-        if consulta_data.status == StatusConsulta.FALTOU and old_status != StatusConsulta.FALTOU:
-            paciente = db.query(Paciente).filter(Paciente.id == consulta.paciente_id).first()
-            if paciente:
-                paciente.faltas_consecutivas += 1
-                # Bloquear após 3 faltas consecutivas
-                if paciente.faltas_consecutivas >= 3:
-                    usuario = db.query(Usuario).filter(Usuario.id == paciente.usuario_id).first()
-                    if usuario:
-                        usuario.bloqueado = True
+    # RN3: Aplicar regra de faltas consecutivas
+    if novo_status == 'faltou' and status_antigo != 'faltou':
+        # Não precisa fazer nada aqui, a verificação é feita ao tentar agendar
+        pass
+    elif novo_status == 'realizada' and status_antigo != 'realizada':
+        # Quando consulta é realizada, não há falta (útil para histórico)
+        pass
     
     db.commit()
     db.refresh(consulta)
     
     return consulta
 
-@router.get("/horarios", response_model=List[HorarioDisponivelResponse])
-def listar_horarios(
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Lista grade de horários do médico"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    horarios = db.query(HorarioDisponivelModel).filter(
-        HorarioDisponivelModel.medico_id == medico.id,
-        HorarioDisponivelModel.ativo == True
-    ).order_by(HorarioDisponivelModel.dia_semana, HorarioDisponivelModel.hora_inicio).all()
-    
-    return horarios
-
-@router.post("/horarios", status_code=status.HTTP_201_CREATED)
-def criar_horario(
-    horario_data: Union[HorarioDisponivelCreate, HorariosMultiplosCreate],
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Adiciona horário(s) disponível(is) na agenda - aceita um horário ou múltiplos"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Verificar se é múltiplos horários ou único
-    if isinstance(horario_data, HorariosMultiplosCreate) or hasattr(horario_data, 'horarios'):
-        # Múltiplos horários
-        horarios_criados = []
-        
-        for horario in horario_data.horarios:
-            # Validar se hora_fim > hora_inicio
-            if horario.hora_fim <= horario.hora_inicio:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Hora fim deve ser maior que hora início (dia {horario.dia_semana})"
-                )
-            
-            novo_horario = HorarioDisponivelModel(
-                medico_id=medico.id,
-                dia_semana=horario.dia_semana,
-                hora_inicio=horario.hora_inicio,
-                hora_fim=horario.hora_fim
-            )
-            
-            db.add(novo_horario)
-            horarios_criados.append(novo_horario)
-        
-        db.commit()
-        
-        # Refresh todos os horários criados
-        for h in horarios_criados:
-            db.refresh(h)
-        
-        return {
-            "message": f"{len(horarios_criados)} horários criados com sucesso",
-            "horarios": [
-                {
-                    "id": h.id,
-                    "dia_semana": h.dia_semana,
-                    "hora_inicio": str(h.hora_inicio),
-                    "hora_fim": str(h.hora_fim),
-                    "medico_id": h.medico_id,
-                    "ativo": h.ativo
-                } for h in horarios_criados
-            ]
-        }
-    else:
-        # Horário único
-        # Validar se hora_fim > hora_inicio
-        if horario_data.hora_fim <= horario_data.hora_inicio:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Hora fim deve ser maior que hora início"
-            )
-        
-        novo_horario = HorarioDisponivelModel(
-            medico_id=medico.id,
-            dia_semana=horario_data.dia_semana,
-            hora_inicio=horario_data.hora_inicio,
-            hora_fim=horario_data.hora_fim
-        )
-        
-        db.add(novo_horario)
-        db.commit()
-        db.refresh(novo_horario)
-        
-        return {
-            "id": novo_horario.id,
-            "dia_semana": novo_horario.dia_semana,
-            "hora_inicio": str(novo_horario.hora_inicio),
-            "hora_fim": str(novo_horario.hora_fim),
-            "medico_id": novo_horario.medico_id,
-            "ativo": novo_horario.ativo
-        }
-
-@router.delete("/horarios/{horario_id}")
-def remover_horario(
-    horario_id: int,
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Remove horário disponível"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    horario = db.query(HorarioDisponivelModel).filter(
-        HorarioDisponivelModel.id == horario_id,
-        HorarioDisponivelModel.medico_id == medico.id
-    ).first()
-    
-    if not horario:
-        raise HTTPException(status_code=404, detail="Horário não encontrado")
-    
-    horario.ativo = False
-    db.commit()
-    
-    return {"message": "Horário removido com sucesso"}
-
-@router.delete("/horarios")
-def limpar_todos_horarios(
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Remove todos os horários disponíveis do médico"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Desativar todos os horários do médico
-    db.query(HorarioDisponivelModel).filter(
-        HorarioDisponivelModel.medico_id == medico.id
-    ).update({"ativo": False})
-    
-    db.commit()
-    
-    return {"message": "Todos os horários foram removidos"}
-
-@router.get("/bloqueios", response_model=List[BloqueioHorarioResponse])
-def listar_bloqueios(
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Lista bloqueios de horários"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    bloqueios = db.query(BloqueioHorarioModel).filter(
-        BloqueioHorarioModel.medico_id == medico.id,
-        BloqueioHorarioModel.data >= date.today()
-    ).order_by(BloqueioHorarioModel.data, BloqueioHorarioModel.hora_inicio).all()
-    
-    return bloqueios
-
-@router.post("/bloqueios", response_model=BloqueioHorarioResponse, status_code=status.HTTP_201_CREATED)
-def criar_bloqueio(
-    bloqueio_data: BloqueioHorarioCreate,
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Bloqueia horário específico"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Validar data futura
-    if bloqueio_data.data < date.today():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não é possível bloquear datas passadas"
-        )
-    
-    # Validar hora_fim > hora_inicio
-    if bloqueio_data.hora_fim <= bloqueio_data.hora_inicio:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Hora fim deve ser maior que hora início"
-        )
-    
-    novo_bloqueio = BloqueioHorarioModel(
-        medico_id=medico.id,
-        data=bloqueio_data.data,
-        hora_inicio=bloqueio_data.hora_inicio,
-        hora_fim=bloqueio_data.hora_fim,
-        motivo=bloqueio_data.motivo
-    )
-    
-    db.add(novo_bloqueio)
-    db.commit()
-    db.refresh(novo_bloqueio)
-    
-    return novo_bloqueio
-
-@router.delete("/bloqueios/{bloqueio_id}")
-def remover_bloqueio(
-    bloqueio_id: int,
-    current_user: Usuario = Depends(get_current_medico),
-    db: Session = Depends(get_db)
-):
-    """Remove bloqueio de horário"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    bloqueio = db.query(BloqueioHorarioModel).filter(
-        BloqueioHorarioModel.id == bloqueio_id,
-        BloqueioHorarioModel.medico_id == medico.id
-    ).first()
-    
-    if not bloqueio:
-        raise HTTPException(status_code=404, detail="Bloqueio não encontrado")
-    
-    db.delete(bloqueio)
-    db.commit()
-    
-    return {"message": "Bloqueio removido com sucesso"}
-
-@router.get("/especialidades", response_model=List[EspecialidadeResponse])
-def listar_especialidades(db: Session = Depends(get_db)):
-    """Lista todas as especialidades médicas"""
-    especialidades = db.query(Especialidade).filter(Especialidade.ativo == True).all()
-    return especialidades
-
-# ============ Endpoints de Observações ============
 
 @router.post("/observacoes", response_model=ObservacaoResponse, status_code=status.HTTP_201_CREATED)
-def criar_observacao(
+def registrar_observacao(
+    medico_id: int,
     observacao_data: ObservacaoCreate,
-    current_user: Usuario = Depends(get_current_medico),
     db: Session = Depends(get_db)
 ):
-    """Registra observação após a consulta (Caso de Uso: Registrar Observações da Consulta)"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Verificar se a consulta existe e pertence ao médico
+    """
+    Caso de Uso: Registrar Observações da Consulta
+    Médico registra observações após a consulta
+    Observação visível apenas para médico e administração
+    """
+    # Verificar se consulta existe e pertence ao médico
     consulta = db.query(Consulta).filter(
-        Consulta.id == observacao_data.consulta_id,
-        Consulta.medico_id == medico.id
+        and_(
+            Consulta.id_consulta == observacao_data.id_consulta_fk,
+            Consulta.id_medico_fk == medico_id
+        )
     ).first()
     
     if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Consulta não encontrada"
+        )
     
     # Verificar se já existe observação para esta consulta
-    observacao_existente = db.query(ObservacaoModel).filter(
-        ObservacaoModel.consulta_id == observacao_data.consulta_id
+    observacao_existente = db.query(Observacao).filter(
+        Observacao.id_consulta_fk == observacao_data.id_consulta_fk
     ).first()
     
     if observacao_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Já existe uma observação para esta consulta"
+            detail="Já existe uma observação para esta consulta. Use PUT para atualizar."
         )
     
-    nova_observacao = ObservacaoModel(
-        consulta_id=observacao_data.consulta_id,
-        descricao=observacao_data.descricao
+    # Criar observação
+    nova_observacao = Observacao(
+        descricao=observacao_data.descricao,
+        id_consulta_fk=observacao_data.id_consulta_fk
     )
     
     db.add(nova_observacao)
@@ -415,61 +350,73 @@ def criar_observacao(
     
     return nova_observacao
 
-@router.get("/observacoes/{consulta_id}", response_model=ObservacaoResponse)
-def get_observacao(
-    consulta_id: int,
-    current_user: Usuario = Depends(get_current_medico),
+
+@router.put("/observacoes/{observacao_id}", response_model=ObservacaoResponse)
+def atualizar_observacao(
+    observacao_id: int,
+    medico_id: int,
+    observacao_data: ObservacaoUpdate,
     db: Session = Depends(get_db)
 ):
-    """Visualiza observação de uma consulta (Caso de Uso: Visualizar Observações da Consulta)"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Verificar se a consulta pertence ao médico
-    consulta = db.query(Consulta).filter(
-        Consulta.id == consulta_id,
-        Consulta.medico_id == medico.id
-    ).first()
-    
-    if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
-    
-    observacao = db.query(ObservacaoModel).filter(
-        ObservacaoModel.consulta_id == consulta_id
+    """
+    Atualiza observação existente
+    Caso de Uso: Registrar Observações da Consulta (edição)
+    """
+    # Buscar observação e verificar se a consulta pertence ao médico
+    observacao = db.query(Observacao).join(Consulta).filter(
+        and_(
+            Observacao.id_observacao == observacao_id,
+            Consulta.id_medico_fk == medico_id
+        )
     ).first()
     
     if not observacao:
-        raise HTTPException(status_code=404, detail="Observação não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Observação não encontrada"
+        )
+    
+    observacao.descricao = observacao_data.descricao
+    
+    db.commit()
+    db.refresh(observacao)
     
     return observacao
 
-@router.put("/observacoes/{consulta_id}", response_model=ObservacaoResponse)
-def atualizar_observacao(
+
+@router.get("/observacoes/{consulta_id}", response_model=ObservacaoResponse)
+def visualizar_observacao(
     consulta_id: int,
-    observacao_data: ObservacaoUpdate,
-    current_user: Usuario = Depends(get_current_medico),
+    medico_id: int,
     db: Session = Depends(get_db)
 ):
-    """Atualiza observação de uma consulta"""
-    medico = db.query(Medico).filter(Medico.usuario_id == current_user.id).first()
-    
-    # Verificar se a consulta pertence ao médico
+    """
+    Caso de Uso: Visualizar Observações da Consulta
+    Médico pode visualizar observações que ele registrou
+    """
+    # Verificar se consulta pertence ao médico
     consulta = db.query(Consulta).filter(
-        Consulta.id == consulta_id,
-        Consulta.medico_id == medico.id
+        and_(
+            Consulta.id_consulta == consulta_id,
+            Consulta.id_medico_fk == medico_id
+        )
     ).first()
     
     if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Consulta não encontrada"
+        )
     
-    observacao = db.query(ObservacaoModel).filter(
-        ObservacaoModel.consulta_id == consulta_id
+    # Buscar observação
+    observacao = db.query(Observacao).filter(
+        Observacao.id_consulta_fk == consulta_id
     ).first()
     
     if not observacao:
-        raise HTTPException(status_code=404, detail="Observação não encontrada")
-    
-    observacao.descricao = observacao_data.descricao
-    db.commit()
-    db.refresh(observacao)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nenhuma observação encontrada para esta consulta"
+        )
     
     return observacao

@@ -2,7 +2,79 @@ from datetime import datetime, date, timedelta, time
 from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
-from app.models import Consulta, HorarioDisponivel, BloqueioHorario, StatusConsulta, Paciente, Usuario
+from app.models.models import Consulta, HorarioTrabalho, Paciente
+import re
+
+
+def validar_cpf(cpf: str) -> bool:
+    """Valida formato do CPF (11 dígitos)"""
+    if not cpf:
+        return False
+    
+    # Verifica se tem apenas dígitos, pontos, hífen e espaços válidos do formato
+    # Formato válido: 123.456.789-00 ou 12345678900
+    if not re.match(r'^[\d\.\-]+$', str(cpf)):
+        return False
+    
+    # Remove caracteres não numéricos
+    cpf_limpo = re.sub(r'\D', '', str(cpf))
+    
+    # Verifica se tem 11 dígitos
+    if len(cpf_limpo) != 11:
+        return False
+    
+    # Verifica se não é uma sequência de números iguais
+    if cpf_limpo == cpf_limpo[0] * 11:
+        return False
+    
+    return True
+
+
+def validar_email(email: str) -> bool:
+    """Valida formato de email"""
+    if not email:
+        return False
+    
+    # Regex simples para validação de email
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+
+def validar_telefone(telefone: str) -> bool:
+    """Valida formato de telefone brasileiro (10 ou 11 dígitos)"""
+    if not telefone:
+        return False
+    
+    # Remove caracteres não numéricos
+    telefone_limpo = re.sub(r'\D', '', str(telefone))
+    
+    # Verifica se tem 10 (fixo) ou 11 (celular) dígitos
+    return len(telefone_limpo) in [10, 11]
+
+
+def validar_senha_alfanumerica(senha: str) -> bool:
+    """
+    Valida senha alfanumérica conforme requisitos:
+    - 8 a 20 caracteres
+    - Deve conter letras E números
+    """
+    if not senha:
+        return False
+    
+    # Verifica tamanho
+    if len(senha) < 8 or len(senha) > 20:
+        return False
+    
+    # Verifica se tem letras
+    tem_letra = any(c.isalpha() for c in senha)
+    
+    # Verifica se tem números
+    tem_numero = any(c.isdigit() for c in senha)
+    
+    # Verifica se não tem espaços
+    tem_espaco = ' ' in senha
+    
+    return tem_letra and tem_numero and not tem_espaco
 
 def validar_limite_consultas(db: Session, paciente_id: int) -> bool:
     """Verifica se o paciente tem menos de 2 consultas agendadas (Regra de Negócio)"""
@@ -60,15 +132,25 @@ def verificar_conflito_horario(
     db: Session,
     medico_id: int,
     data: date,
-    hora: time
+    hora: time,
+    excluir_consulta_id: int = None
 ) -> bool:
-    """Verifica se já existe uma consulta no mesmo horário"""
-    conflito = db.query(Consulta).filter(
+    """
+    Verifica se já existe uma consulta no mesmo horário
+    excluir_consulta_id: ID da consulta a ser excluída da verificação (usado em reagendamento)
+    """
+    query = db.query(Consulta).filter(
         Consulta.medico_id == medico_id,
         Consulta.data == data,
         Consulta.hora == hora,
         Consulta.status.in_([StatusConsulta.AGENDADA, StatusConsulta.CONFIRMADA])
-    ).first()
+    )
+    
+    # Se fornecido, exclui a consulta especificada da verificação
+    if excluir_consulta_id:
+        query = query.filter(Consulta.id != excluir_consulta_id)
+    
+    conflito = query.first()
     
     return conflito is not None
 

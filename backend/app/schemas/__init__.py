@@ -24,6 +24,7 @@ __all__ = [
     "ConsultaCreate",
     "ConsultaUpdate",
     "ConsultaCancelar",
+    "ConsultaReagendar",
     "ConsultaResponse",
     "ConsultaDetalhada",
     "ObservacaoCreate",
