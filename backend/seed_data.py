@@ -8,10 +8,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal
 from app.models import (
-    Usuario, Admin, Especialidade, Convenio, Medico, TipoUsuario
+    Usuario, Admin, Especialidade, Convenio, Medico, Paciente, HorarioDisponivel, TipoUsuario
 )
 from app.utils.auth import get_password_hash
-from datetime import time
+from datetime import time, date
 
 def seed_database():
     db = SessionLocal()
@@ -44,10 +44,10 @@ def seed_database():
         # 2. Criar Convênios
         print("\n🏥 Criando Convênios...")
         convenios_data = [
-            {"nome": "Unimed", "cnpj": "12.345.678/0001-90", "telefone": "(47) 3333-4444", "email": "contato@unimed.com.br"},
-            {"nome": "Bradesco Saúde", "cnpj": "98.765.432/0001-10", "telefone": "(47) 3333-5555", "email": "contato@bradescosaude.com.br"},
-            {"nome": "SulAmérica", "cnpj": "11.222.333/0001-44", "telefone": "(47) 3333-6666", "email": "contato@sulamerica.com.br"},
-            {"nome": "Particular", "cnpj": None, "telefone": None, "email": None},
+            {"nome": "Unimed", "codigo": "UNI001", "telefone": "(47) 3333-4444", "email": "contato@unimed.com.br", "descricao": "Convênio Unimed"},
+            {"nome": "Bradesco Saúde", "codigo": "BRA001", "telefone": "(47) 3333-5555", "email": "contato@bradescosaude.com.br", "descricao": "Convênio Bradesco Saúde"},
+            {"nome": "SulAmérica", "codigo": "SUL001", "telefone": "(47) 3333-6666", "email": "contato@sulamerica.com.br", "descricao": "Convênio SulAmérica"},
+            {"nome": "Particular", "codigo": "PAR001", "telefone": None, "email": None, "descricao": "Atendimento particular"},
         ]
         
         for conv_data in convenios_data:
@@ -147,12 +147,131 @@ def seed_database():
         
         db.commit()
         
+        # 5. Criar horários de trabalho para os médicos
+        print("\n⏰ Criando Horários de Trabalho...")
+        medicos = db.query(Medico).all()
+        
+        for medico in medicos:
+            # Verificar se já tem horários
+            horarios_existentes = db.query(HorarioDisponivel).filter(HorarioDisponivel.medico_id == medico.id).count()
+            
+            if horarios_existentes == 0:
+                # Segunda a Sexta: 8h às 12h e 14h às 18h
+                for dia in range(0, 5):  # 0=Segunda, 4=Sexta
+                    # Manhã
+                    horario_manha = HorarioDisponivel(
+                        medico_id=medico.id,
+                        dia_semana=dia,
+                        hora_inicio=time(8, 0),
+                        hora_fim=time(12, 0),
+                        ativo=True
+                    )
+                    db.add(horario_manha)
+                    
+                    # Tarde
+                    horario_tarde = HorarioDisponivel(
+                        medico_id=medico.id,
+                        dia_semana=dia,
+                        hora_inicio=time(14, 0),
+                        hora_fim=time(18, 0),
+                        ativo=True
+                    )
+                    db.add(horario_tarde)
+                
+                print(f"  ✓ Horários criados para {medico.usuario.nome}")
+        
+        db.commit()
+        
+        # 6. Criar pacientes de teste
+        print("\n👥 Criando Pacientes de teste...")
+        
+        unimed = db.query(Convenio).filter(Convenio.nome == "Unimed").first()
+        particular = db.query(Convenio).filter(Convenio.nome == "Particular").first()
+        
+        pacientes_data = [
+            {
+                "email": "paciente1@teste.com",
+                "senha": "paciente123",
+                "nome": "Carlos Mendes",
+                "cpf": "111.222.333-44",
+                "data_nascimento": date(1990, 5, 15),
+                "telefone": "(47) 98888-1111",
+                "endereco": "Rua das Flores, 123",
+                "cidade": "Itajaí",
+                "estado": "SC",
+                "cep": "88301-000",
+                "convenio_id": unimed.id if unimed else None,
+                "numero_carteirinha": "UNI123456"
+            },
+            {
+                "email": "paciente2@teste.com",
+                "senha": "paciente123",
+                "nome": "Ana Paula Silva",
+                "cpf": "222.333.444-55",
+                "data_nascimento": date(1985, 8, 20),
+                "telefone": "(47) 98888-2222",
+                "endereco": "Av. Central, 456",
+                "cidade": "Balneário Camboriú",
+                "estado": "SC",
+                "cep": "88330-000",
+                "convenio_id": particular.id if particular else None,
+                "numero_carteirinha": None
+            },
+            {
+                "email": "paciente3@teste.com",
+                "senha": "paciente123",
+                "nome": "Roberto Costa",
+                "cpf": "333.444.555-66",
+                "data_nascimento": date(1978, 3, 10),
+                "telefone": "(47) 98888-3333",
+                "endereco": "Rua São Paulo, 789",
+                "cidade": "Itajaí",
+                "estado": "SC",
+                "cep": "88302-000",
+                "convenio_id": unimed.id if unimed else None,
+                "numero_carteirinha": "UNI789012"
+            }
+        ]
+        
+        for pac_data in pacientes_data:
+            existe = db.query(Usuario).filter(Usuario.email == pac_data["email"]).first()
+            if not existe:
+                usuario_paciente = Usuario(
+                    email=pac_data["email"],
+                    senha_hash=get_password_hash(pac_data["senha"]),
+                    nome=pac_data["nome"],
+                    tipo=TipoUsuario.PACIENTE
+                )
+                db.add(usuario_paciente)
+                db.flush()
+                
+                paciente = Paciente(
+                    usuario_id=usuario_paciente.id,
+                    cpf=pac_data["cpf"],
+                    data_nascimento=pac_data["data_nascimento"],
+                    telefone=pac_data["telefone"],
+                    endereco=pac_data["endereco"],
+                    cidade=pac_data["cidade"],
+                    estado=pac_data["estado"],
+                    cep=pac_data["cep"],
+                    convenio_id=pac_data["convenio_id"],
+                    numero_carteirinha=pac_data["numero_carteirinha"],
+                    faltas_consecutivas=0
+                )
+                db.add(paciente)
+                print(f"  ✓ {pac_data['nome']} - {pac_data['email']} / paciente123")
+        
+        db.commit()
+        
         print("\n✅ Seed concluído com sucesso!")
         print("\n📝 Credenciais de acesso:")
         print("   Admin: admin@clinica.com / admin123")
         print("   Médicos: dr.silva@clinica.com / medico123")
         print("            dra.santos@clinica.com / medico123")
         print("            dr.oliveira@clinica.com / medico123")
+        print("   Pacientes: paciente1@teste.com / paciente123")
+        print("              paciente2@teste.com / paciente123")
+        print("              paciente3@teste.com / paciente123")
         
     except Exception as e:
         print(f"\n❌ Erro: {e}")
