@@ -1,50 +1,35 @@
-// Agendar Consulta
-document.addEventListener('DOMContentLoaded', function() {
+// Agendar Consulta - Integrado com API
+document.addEventListener('DOMContentLoaded', async function() {
+    requireAuth();
+    requireUserType('paciente');
+    
     const especialidadeSelect = document.getElementById('especialidade');
     const medicoSelect = document.getElementById('medico');
     const dataInput = document.getElementById('data');
     const horarioSelect = document.getElementById('horario');
     
-    // Médicos por especialidade (simulado)
-    const medicosPorEspecialidade = {
-        'cardiologia': ['Dr. João Silva - CRM 12345', 'Dra. Paula Cardoso - CRM 54322'],
-        'dermatologia': ['Dr. Carlos Mendes - CRM 78901'],
-        'ortopedia': ['Dra. Maria Santos - CRM 54321'],
-        'pediatria': ['Dr. Roberto Lima - CRM 11223'],
-        'clinico-geral': ['Dr. Pedro Oliveira - CRM 98765'],
-        'ginecologia': ['Dra. Julia Ferreira - CRM 33445'],
-        'oftalmologia': ['Dra. Ana Costa - CRM 45678']
-    };
-    
-    // Horários disponíveis (simulado)
-    const horariosDisponiveis = [
-        '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-        '11:00', '11:30', '14:00', '14:30', '15:00', '15:30',
-        '16:00', '16:30', '17:00', '17:30'
-    ];
+    // Carregar especialidades
+    await carregarEspecialidades();
     
     // Quando selecionar especialidade, carregar médicos
-    especialidadeSelect?.addEventListener('change', function() {
-        const especialidade = this.value;
-        medicoSelect.disabled = !especialidade;
+    especialidadeSelect?.addEventListener('change', async function() {
+        const especialidadeId = this.value;
+        medicoSelect.disabled = !especialidadeId;
         medicoSelect.innerHTML = '<option value="">Selecione um médico</option>';
-        
-        if (especialidade && medicosPorEspecialidade[especialidade]) {
-            medicosPorEspecialidade[especialidade].forEach(medico => {
-                const option = document.createElement('option');
-                option.value = medico;
-                option.textContent = medico;
-                medicoSelect.appendChild(option);
-            });
-        }
-        
         dataInput.disabled = true;
         horarioSelect.disabled = true;
+        
+        if (especialidadeId) {
+            await carregarMedicos(especialidadeId);
+        }
     });
     
     // Quando selecionar médico, habilitar data
     medicoSelect?.addEventListener('change', function() {
         dataInput.disabled = !this.value;
+        horarioSelect.disabled = true;
+        horarioSelect.innerHTML = '<option value="">Selecione um horário</option>';
+        
         if (this.value) {
             // Definir data mínima como amanhã
             const tomorrow = new Date();
@@ -53,37 +38,154 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Quando selecionar data, carregar horários
-    dataInput?.addEventListener('change', function() {
-        horarioSelect.disabled = !this.value;
-        horarioSelect.innerHTML = '<option value="">Selecione um horário</option>';
+    // Quando selecionar data, carregar horários disponíveis
+    dataInput?.addEventListener('change', async function() {
+        const medicoId = medicoSelect.value;
+        const data = this.value;
         
-        if (this.value) {
-            horariosDisponiveis.forEach(horario => {
+        if (medicoId && data) {
+            await carregarHorariosDisponiveis(medicoId, data);
+        }
+    });
+    
+    // Submissão do formulário
+    document.getElementById('agendarForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const medicoId = medicoSelect.value;
+        const data = dataInput.value;
+        const horario = horarioSelect.value;
+        
+        if (!medicoId || !data || !horario) {
+            showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
+            return;
+        }
+        
+        await agendarConsulta(medicoId, data, horario);
+    });
+});
+
+// Carregar especialidades
+async function carregarEspecialidades() {
+    try {
+        const especialidades = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_ESPECIALIDADES);
+        const especialidadeSelect = document.getElementById('especialidade');
+        
+        if (!especialidadeSelect) return;
+        
+        especialidadeSelect.innerHTML = '<option value="">Selecione uma especialidade</option>';
+        
+        especialidades.forEach(esp => {
+            const option = document.createElement('option');
+            option.value = esp.id_especialidade;
+            option.textContent = esp.nome;
+            especialidadeSelect.appendChild(option);
+        });
+        
+        console.log(`✅ ${especialidades.length} especialidades carregadas`);
+    } catch (error) {
+        console.error('Erro ao carregar especialidades:', error);
+        showMessage('Erro ao carregar especialidades', 'error');
+    }
+}
+
+// Carregar médicos por especialidade
+async function carregarMedicos(especialidadeId) {
+    try {
+        const medicos = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_MEDICOS, { especialidade_id: especialidadeId });
+        const medicoSelect = document.getElementById('medico');
+        
+        if (!medicoSelect) return;
+        
+        medicoSelect.innerHTML = '<option value="">Selecione um médico</option>';
+        
+        if (medicos && medicos.length > 0) {
+            medicos.forEach(medico => {
+                const option = document.createElement('option');
+                option.value = medico.id_medico;
+                option.textContent = `${medico.nome} - CRM ${medico.crm}`;
+                medicoSelect.appendChild(option);
+            });
+            console.log(`✅ ${medicos.length} médicos carregados`);
+        } else {
+            medicoSelect.innerHTML = '<option value="">Nenhum médico disponível</option>';
+            showMessage('Nenhum médico disponível para esta especialidade', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar médicos:', error);
+        showMessage('Erro ao carregar médicos', 'error');
+    }
+}
+
+// Carregar horários disponíveis
+async function carregarHorariosDisponiveis(medicoId, data) {
+    try {
+        const horarios = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_HORARIOS_DISPONIVEIS(medicoId), { data });
+        const horarioSelect = document.getElementById('horario');
+        
+        if (!horarioSelect) return;
+        
+        horarioSelect.innerHTML = '<option value="">Selecione um horário</option>';
+        horarioSelect.disabled = false;
+        
+        if (horarios && horarios.length > 0) {
+            horarios.forEach(horario => {
                 const option = document.createElement('option');
                 option.value = horario;
                 option.textContent = horario;
                 horarioSelect.appendChild(option);
             });
+            console.log(`✅ ${horarios.length} horários disponíveis`);
+        } else {
+            horarioSelect.innerHTML = '<option value="">Nenhum horário disponível</option>';
+            showMessage('Nenhum horário disponível para esta data', 'error');
         }
-    });
+    } catch (error) {
+        console.error('Erro ao carregar horários:', error);
+        showMessage('Erro ao carregar horários disponíveis', 'error');
+    }
+}
+
+// Agendar consulta
+async function agendarConsulta(medicoId, data, horario) {
+    const btnSubmit = document.querySelector('#agendarForm button[type="submit"]');
+    const originalText = btnSubmit ? btnSubmit.innerHTML : '';
     
-    // Submissão do formulário
-    document.getElementById('agendarForm')?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const especialidade = especialidadeSelect.value;
-        const medico = medicoSelect.value;
-        const data = dataInput.value;
-        const horario = horarioSelect.value;
-        
-        if (!especialidade || !medico || !data || !horario) {
-            alert('Por favor, preencha todos os campos obrigatórios!');
-            return;
+    try {
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agendando...';
         }
         
-        // Simular agendamento bem-sucedido
-        alert('Consulta agendada com sucesso!');
-        window.location.href = 'consultas.html';
-    });
-});
+        const pacienteId = api.getUserId();
+        
+        // Criar data_hora_inicio e data_hora_fim no formato ISO
+        const dataHoraInicio = toISODateTime(data, horario);
+        const horaFim = calcularHoraFim(horario, 30); // 30 minutos de duração
+        const dataHoraFim = toISODateTime(data, horaFim);
+        
+        const dadosConsulta = {
+            data_hora_inicio: dataHoraInicio,
+            data_hora_fim: dataHoraFim,
+            id_paciente_fk: parseInt(pacienteId),
+            id_medico_fk: parseInt(medicoId)
+        };
+        
+        await api.post(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS, dadosConsulta);
+        
+        showMessage('Consulta agendada com sucesso!', 'success');
+        
+        setTimeout(() => {
+            window.location.href = 'consultas.html';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Erro ao agendar consulta:', error);
+        showMessage(error.message || 'Erro ao agendar consulta. Verifique se você não possui o limite de 2 consultas futuras.', 'error');
+        
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = originalText;
+        }
+    }
+}
