@@ -55,10 +55,9 @@ document.getElementById('loginMedicoForm')?.addEventListener('submit', async fun
         // Obter dados completos do usuário
         const user = await api.getCurrentUser();
         
-        // Armazenar dados do usuário (compatibilidade com código antigo)
-        localStorage.setItem('userRole', 'medico');
+        // Armazenar nome do usuário
         localStorage.setItem('userName', user.nome || 'Médico');
-        // user_type e user_id já foram salvos pelo api.loginCRM()
+        // token, user_type e user_id já foram salvos pelo api.loginCRM()
         
         showMessage('Login realizado com sucesso!', 'success');
         

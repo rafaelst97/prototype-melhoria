@@ -38,10 +38,9 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
             return;
         }
         
-        // Armazenar dados do usuário (compatibilidade com código antigo)
-        localStorage.setItem('userRole', 'paciente');
+        // Armazenar nome do usuário
         localStorage.setItem('userName', user.nome);
-        // user_type e user_id já foram salvos pelo api.login()
+        // token, user_type e user_id já foram salvos pelo api.login()
         
         showMessage('Login realizado com sucesso!', 'success');
         

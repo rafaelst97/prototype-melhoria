@@ -53,9 +53,7 @@ document.getElementById('loginAdminForm')?.addEventListener('submit', async func
             return;
         }
         
-        // Armazenar dados do usuário (compatibilidade com código antigo)
-        localStorage.setItem('userRole', 'admin');
-        // user_type e user_id já foram salvos pelo api.login()
+        // token, user_type e user_id já foram salvos pelo api.login()
         
         console.log('Login realizado com sucesso!');
         showMessage('Login realizado com sucesso!', 'success');
