@@ -1,8 +1,11 @@
-// Gerenciar Pacientes - Admin
+// Gerenciar Pacientes - Admin - Integrado com API
 let pacientes = [];
 let pacientesFiltrados = [];
 
 document.addEventListener('DOMContentLoaded', async function() {
+    requireAuth();
+    requireUserType('administrador');
+    
     await carregarPacientes();
     configurarBusca();
 });
@@ -11,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function carregarPacientes() {
     try {
         showLoading();
-        pacientes = await api.get('/admin/pacientes');
+        pacientes = await api.get(API_CONFIG.ENDPOINTS.ADMIN_PACIENTES_LISTAR);
         pacientesFiltrados = [...pacientes];
         renderizarPacientes();
         hideLoading();
@@ -191,17 +194,17 @@ async function verDetalhesPaciente(pacienteId) {
     }
 }
 
-// Desbloquear paciente
+// Desbloquear paciente (RN3 - desbloquear após 3 faltas consecutivas)
 async function desbloquearPaciente(pacienteId) {
-    if (!confirm('Deseja realmente desbloquear este paciente?')) {
+    if (!confirm('Deseja realmente desbloquear este paciente? Isso irá zerar o contador de faltas consecutivas.')) {
         return;
     }
     
     try {
         showLoading();
-        await api.put(`/admin/pacientes/${pacienteId}/desbloquear`, {});
-        showMessage('Paciente desbloqueado com sucesso!', 'success');
-        await carregarPacientes(); // Recarregar lista
+        await api.put(API_CONFIG.ENDPOINTS.ADMIN_PACIENTE_DESBLOQUEAR(pacienteId));
+        showMessage('Paciente desbloqueado com sucesso! Contador de faltas zerado.', 'success');
+        await carregarPacientes();
         hideLoading();
     } catch (error) {
         console.error('Erro ao desbloquear:', error);

@@ -1,8 +1,11 @@
-// Gerenciar Médicos - Admin
+// Gerenciar Médicos - Admin - Integrado com API
 let medicos = [];
 let especialidades = [];
 
 document.addEventListener('DOMContentLoaded', async function() {
+    requireAuth();
+    requireUserType('administrador');
+    
     await carregarEspecialidades();
     await carregarMedicos();
     configurarFormularioCadastro();
@@ -11,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Carregar especialidades
 async function carregarEspecialidades() {
     try {
-        especialidades = await api.get('/pacientes/especialidades');
+        especialidades = await api.get(API_CONFIG.ENDPOINTS.ESPECIALIDADES);
         
         const select = document.getElementById('especialidade');
         if (select && especialidades.length > 0) {
@@ -32,7 +35,7 @@ async function carregarEspecialidades() {
 async function carregarMedicos() {
     try {
         showLoading();
-        medicos = await api.get('/admin/medicos');
+        medicos = await api.get(API_CONFIG.ENDPOINTS.ADMIN_MEDICOS_LISTAR);
         renderizarMedicos();
         hideLoading();
     } catch (error) {
