@@ -6,6 +6,8 @@
     <title>Agendar Consulta - Clínica Saúde+</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
+    <!-- Scripts necessários -->
+    <script src="../js/api.js"></script>
     <script src="../js/auth-guard.js"></script>
 </head>
 <body>
@@ -32,14 +34,7 @@
                     <div class="form-group">
                         <label for="especialidade">Especialidade *</label>
                         <select id="especialidade" name="especialidade" required>
-                            <option value="">Selecione uma especialidade</option>
-                            <option value="cardiologia">Cardiologia</option>
-                            <option value="dermatologia">Dermatologia</option>
-                            <option value="ortopedia">Ortopedia</option>
-                            <option value="pediatria">Pediatria</option>
-                            <option value="clinico-geral">Clínico Geral</option>
-                            <option value="ginecologia">Ginecologia</option>
-                            <option value="oftalmologia">Oftalmologia</option>
+                            <option value="">Carregando especialidades...</option>
                         </select>
                     </div>
 

@@ -92,10 +92,17 @@ async function carregarEspecialidades() {
 // Carregar médicos por especialidade
 async function carregarMedicos(especialidadeId) {
     try {
+        console.log(`📡 Buscando médicos para especialidade ID: ${especialidadeId}`);
         const medicos = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_MEDICOS, { especialidade_id: especialidadeId });
+        console.log('📋 Resposta da API:', medicos);
+        console.log('📋 Tipo:', typeof medicos, 'É array?', Array.isArray(medicos));
+        
         const medicoSelect = document.getElementById('medico');
         
-        if (!medicoSelect) return;
+        if (!medicoSelect) {
+            console.error('❌ Elemento #medico não encontrado!');
+            return;
+        }
         
         medicoSelect.innerHTML = '<option value="">Selecione um médico</option>';
         
@@ -106,13 +113,19 @@ async function carregarMedicos(especialidadeId) {
                 option.textContent = `${medico.nome} - CRM ${medico.crm}`;
                 medicoSelect.appendChild(option);
             });
-            console.log(`✅ ${medicos.length} médicos carregados`);
+            console.log(`✅ ${medicos.length} médicos carregados com sucesso`);
+            medicoSelect.disabled = false;
         } else {
+            console.warn('⚠️ Nenhum médico encontrado');
             medicoSelect.innerHTML = '<option value="">Nenhum médico disponível</option>';
-            showMessage('Nenhum médico disponível para esta especialidade', 'error');
+            showMessage('Nenhum médico disponível para esta especialidade', 'warning');
         }
     } catch (error) {
-        console.error('Erro ao carregar médicos:', error);
+        console.error('❌ Erro ao carregar médicos:', error);
+        const medicoSelect = document.getElementById('medico');
+        if (medicoSelect) {
+            medicoSelect.innerHTML = '<option value="">Erro ao carregar médicos</option>';
+        }
         showMessage('Erro ao carregar médicos', 'error');
     }
 }
@@ -120,13 +133,19 @@ async function carregarMedicos(especialidadeId) {
 // Carregar horários disponíveis
 async function carregarHorariosDisponiveis(medicoId, data) {
     try {
-        const horarios = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_HORARIOS_DISPONIVEIS(medicoId), { data });
+        console.log(`📡 Buscando horários para médico ID: ${medicoId}, data: ${data}`);
+        const response = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_HORARIOS_DISPONIVEIS(medicoId), { data });
+        console.log('📋 Resposta horários:', response);
+        
         const horarioSelect = document.getElementById('horario');
         
         if (!horarioSelect) return;
         
         horarioSelect.innerHTML = '<option value="">Selecione um horário</option>';
         horarioSelect.disabled = false;
+        
+        // O backend retorna: { data: "...", horarios_disponiveis: ["09:00", "10:00", ...] }
+        const horarios = response.horarios_disponiveis || [];
         
         if (horarios && horarios.length > 0) {
             horarios.forEach(horario => {
@@ -135,13 +154,18 @@ async function carregarHorariosDisponiveis(medicoId, data) {
                 option.textContent = horario;
                 horarioSelect.appendChild(option);
             });
-            console.log(`✅ ${horarios.length} horários disponíveis`);
+            console.log(`✅ ${horarios.length} horários disponíveis carregados`);
         } else {
+            console.warn('⚠️ Nenhum horário disponível para esta data');
             horarioSelect.innerHTML = '<option value="">Nenhum horário disponível</option>';
-            showMessage('Nenhum horário disponível para esta data', 'error');
+            showMessage('Nenhum horário disponível para esta data', 'warning');
         }
     } catch (error) {
-        console.error('Erro ao carregar horários:', error);
+        console.error('❌ Erro ao carregar horários:', error);
+        const horarioSelect = document.getElementById('horario');
+        if (horarioSelect) {
+            horarioSelect.innerHTML = '<option value="">Erro ao carregar horários</option>';
+        }
         showMessage('Erro ao carregar horários disponíveis', 'error');
     }
 }
@@ -159,19 +183,20 @@ async function agendarConsulta(medicoId, data, horario) {
         
         const pacienteId = api.getUserId();
         
-        // Criar data_hora_inicio e data_hora_fim no formato ISO
-        const dataHoraInicio = toISODateTime(data, horario);
-        const horaFim = calcularHoraFim(horario, 30); // 30 minutos de duração
-        const dataHoraFim = toISODateTime(data, horaFim);
+        // Criar data_hora no formato ISO (conforme schema ConsultaCreate)
+        const dataHora = toISODateTime(data, horario);
         
         const dadosConsulta = {
-            data_hora_inicio: dataHoraInicio,
-            data_hora_fim: dataHoraFim,
-            id_paciente_fk: parseInt(pacienteId),
-            id_medico_fk: parseInt(medicoId)
+            data_hora: dataHora,
+            id_medico: parseInt(medicoId),
+            tipo: "Consulta"
         };
         
-        await api.post(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS, dadosConsulta);
+        // Incluir paciente_id como query parameter
+        const url = `${API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS}?paciente_id=${pacienteId}`;
+        
+        console.log('📤 Agendando consulta:', { url, dadosConsulta });
+        await api.post(url, dadosConsulta);
         
         showMessage('Consulta agendada com sucesso!', 'success');
         
@@ -180,8 +205,24 @@ async function agendarConsulta(medicoId, data, horario) {
         }, 2000);
         
     } catch (error) {
-        console.error('Erro ao agendar consulta:', error);
-        showMessage(error.message || 'Erro ao agendar consulta. Verifique se você não possui o limite de 2 consultas futuras.', 'error');
+        console.error('❌ Erro ao agendar consulta:', error);
+        
+        // Melhor tratamento de mensagens de erro
+        let mensagemErro = 'Erro ao agendar consulta';
+        
+        if (error.response && error.response.detail) {
+            // Erro do backend (FastAPI)
+            if (typeof error.response.detail === 'string') {
+                mensagemErro = error.response.detail;
+            } else if (Array.isArray(error.response.detail)) {
+                // Erros de validação do Pydantic
+                mensagemErro = error.response.detail.map(err => err.msg || err).join(', ');
+            }
+        } else if (error.message) {
+            mensagemErro = error.message;
+        }
+        
+        showMessage(mensagemErro, 'error');
         
         if (btnSubmit) {
             btnSubmit.disabled = false;
