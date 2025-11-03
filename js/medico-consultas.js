@@ -1,22 +1,65 @@
 // Variáveis globais
+let medicoId = null;
 let todasConsultas = [];
 let consultaSelecionada = null;
 
 // Carregar consultas ao iniciar
 document.addEventListener('DOMContentLoaded', async function() {
+    requireAuth();
+    requireUserType('medico');
+    
+    medicoId = api.getUserId();
     await carregarConsultas();
+    configurarFiltros();
 });
 
 // Carregar consultas do médico
 async function carregarConsultas() {
     try {
-        const consultas = await api.get('/medicos/consultas');
+        const consultas = await api.get(API_CONFIG.ENDPOINTS.MEDICO_CONSULTAS(medicoId));
         todasConsultas = consultas;
         renderizarConsultas(consultas);
     } catch (error) {
         console.error('Erro ao carregar consultas:', error);
         showMessage('Erro ao carregar consultas: ' + error.message, 'error');
     }
+}
+
+function configurarFiltros() {
+    const filtroStatus = document.getElementById('filtro-status');
+    const filtroPeriodo = document.getElementById('filtro-periodo');
+    
+    if (filtroStatus) {
+        filtroStatus.addEventListener('change', aplicarFiltros);
+    }
+    
+    if (filtroPeriodo) {
+        filtroPeriodo.addEventListener('change', aplicarFiltros);
+    }
+}
+
+function aplicarFiltros() {
+    const filtroStatus = document.getElementById('filtro-status')?.value;
+    const filtroPeriodo = document.getElementById('filtro-periodo')?.value;
+    
+    let consultasFiltradas = [...todasConsultas];
+    
+    // Filtrar por status
+    if (filtroStatus && filtroStatus !== 'todos') {
+        consultasFiltradas = consultasFiltradas.filter(c => c.status === filtroStatus);
+    }
+    
+    // Filtrar por período
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    if (filtroPeriodo === 'futuras') {
+        consultasFiltradas = consultasFiltradas.filter(c => new Date(c.data_hora_inicio) >= hoje);
+    } else if (filtroPeriodo === 'passadas') {
+        consultasFiltradas = consultasFiltradas.filter(c => new Date(c.data_hora_inicio) < hoje);
+    }
+    
+    renderizarConsultas(consultasFiltradas);
 }
 
 // Renderizar lista de consultas
@@ -79,7 +122,7 @@ function renderizarConsultas(consultas) {
 // Ver detalhes da consulta
 async function verDetalhesConsulta(consultaId) {
     try {
-        const consulta = await api.get(`/medicos/consultas/${consultaId}`);
+        const consulta = await api.get(API_CONFIG.ENDPOINTS.MEDICO_CONSULTA_DETALHES(medicoId, consultaId));
         consultaSelecionada = consulta;
         
         // Exibir detalhes em um modal
@@ -180,7 +223,7 @@ async function salvarObservacao(event, consultaId) {
     }
     
     try {
-        await api.post(`/medicos/consultas/${consultaId}/observacoes`, {
+        await api.post(API_CONFIG.ENDPOINTS.MEDICO_OBSERVACAO_CRIAR(medicoId, consultaId), {
             descricao: descricao
         });
         
