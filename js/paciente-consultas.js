@@ -205,17 +205,20 @@ async function carregarHorariosDisponiveisInicial(horarioAtual) {
         optionAtual.selected = true;
         selectHora.appendChild(optionAtual);
         
-        if (response.length === 0) {
+        // O backend retorna: { data: "...", horarios_disponiveis: ["09:00", "10:00", ...] }
+        const horarios = response.horarios_disponiveis || [];
+        
+        if (horarios.length === 0) {
             return; // Pelo menos tem o horário atual
         }
         
         // Adicionar outros horários disponíveis
-        response.forEach(horario => {
+        horarios.forEach(horario => {
             // Evitar duplicar o horário atual
-            if (horario.hora_inicio !== horarioAtual) {
+            if (horario !== horarioAtual) {
                 const option = document.createElement('option');
-                option.value = horario.hora_inicio;
-                option.textContent = horario.hora_inicio;
+                option.value = horario;
+                option.textContent = horario;
                 selectHora.appendChild(option);
             }
         });
@@ -239,15 +242,18 @@ async function carregarHorariosDisponiveis() {
         
         selectHora.innerHTML = '<option value="">Selecione um horário</option>';
         
-        if (response.length === 0) {
+        // O backend retorna: { data: "...", horarios_disponiveis: ["09:00", "10:00", ...] }
+        const horarios = response.horarios_disponiveis || [];
+        
+        if (horarios.length === 0) {
             selectHora.innerHTML = '<option value="">Nenhum horário disponível</option>';
             return;
         }
         
-        response.forEach(horario => {
+        horarios.forEach(horario => {
             const option = document.createElement('option');
-            option.value = horario.hora_inicio;
-            option.textContent = horario.hora_inicio;
+            option.value = horario;
+            option.textContent = horario;
             selectHora.appendChild(option);
         });
     } catch (error) {
@@ -276,11 +282,16 @@ document.getElementById('form-reagendar').addEventListener('submit', async funct
     try {
         // Criar data_hora_inicio no formato ISO
         const novaDataHoraInicio = `${novaData}T${novaHora}:00`;
-        const novaDataHoraFim = calcularHoraFim(novaDataHoraInicio);
+        const pacienteId = api.getUserId();
         
-        await api.put(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTA_REAGENDAR(consultaAtual.id), {
-            data_hora_inicio: novaDataHoraInicio,
-            data_hora_fim: novaDataHoraFim,
+        // Usar id_consulta ou id (suporte para ambos)
+        const consultaId = consultaAtual.id_consulta || consultaAtual.id;
+        
+        // Incluir paciente_id como query parameter
+        const url = `${API_CONFIG.ENDPOINTS.PACIENTE_CONSULTA_REAGENDAR(consultaId)}?paciente_id=${pacienteId}`;
+        
+        await api.put(url, {
+            nova_data_hora_inicio: novaDataHoraInicio,
             motivo_reagendamento: motivo
         });
         
@@ -289,14 +300,38 @@ document.getElementById('form-reagendar').addEventListener('submit', async funct
         await carregarConsultas();
     } catch (error) {
         console.error('Erro ao reagendar:', error);
-        mostrarErroReagendar(error.message || 'Erro ao reagendar consulta');
+        // Melhor tratamento de erros
+        let mensagemErro = 'Erro ao reagendar consulta';
+        
+        if (error.response && error.response.detail) {
+            mensagemErro = error.response.detail;
+        } else if (error.message) {
+            mensagemErro = error.message;
+        }
+        
+        mostrarErroReagendar(mensagemErro);
     }
 });
 
 function mostrarErroReagendar(mensagem) {
     const errorDiv = document.getElementById('reagendar-error-message');
-    errorDiv.textContent = mensagem;
+    
+    // Se for um array de erros (validação do Pydantic)
+    if (Array.isArray(mensagem)) {
+        errorDiv.textContent = mensagem.map(err => err.msg || err).join(', ');
+    } else if (typeof mensagem === 'object') {
+        // Se for um objeto, tentar extrair mensagens
+        errorDiv.textContent = JSON.stringify(mensagem);
+    } else {
+        errorDiv.textContent = mensagem;
+    }
+    
     errorDiv.style.display = 'block';
+    
+    // Esconder automaticamente após 5 segundos
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
 }
 
 // ==================== CANCELAMENTO ====================
@@ -347,25 +382,71 @@ document.getElementById('form-cancelar').addEventListener('submit', async functi
     e.preventDefault();
     
     const motivo = document.getElementById('motivo-cancelamento').value;
+    const pacienteId = api.getUserId();
+    
+    console.log('🗑️ Iniciando cancelamento:', {
+        consultaId: consultaAtual.id_consulta,
+        pacienteId,
+        motivo
+    });
     
     try {
-        await api.delete(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTA_CANCELAR(consultaAtual.id), {
-            data: { motivo_cancelamento: motivo }
+        // Usar id_consulta ou id (suporte para ambos)
+        const consultaId = consultaAtual.id_consulta || consultaAtual.id;
+        
+        // Incluir paciente_id como query parameter
+        const url = `${API_CONFIG.ENDPOINTS.PACIENTE_CONSULTA_CANCELAR(consultaId)}?paciente_id=${pacienteId}`;
+        
+        console.log('📡 URL do cancelamento:', url);
+        
+        // Enviar dados diretamente (não dentro de "data")
+        const resultado = await api.delete(url, {
+            motivo_cancelamento: motivo || null
         });
+        
+        console.log('✅ Cancelamento bem-sucedido:', resultado);
         
         fecharModalCancelar();
         showMessage('Consulta cancelada com sucesso!', 'success');
         await carregarConsultas();
     } catch (error) {
-        console.error('Erro ao cancelar:', error);
-        mostrarErroCancelar(error.message || 'Erro ao cancelar consulta');
+        console.error('❌ Erro ao cancelar:', error);
+        
+        // Melhor tratamento de mensagens de erro
+        let mensagemErro = 'Erro ao cancelar consulta';
+        
+        if (error.response && error.response.detail) {
+            if (typeof error.response.detail === 'string') {
+                mensagemErro = error.response.detail;
+            } else if (Array.isArray(error.response.detail)) {
+                mensagemErro = error.response.detail.map(err => err.msg || err).join(', ');
+            }
+        } else if (error.message) {
+            mensagemErro = error.message;
+        }
+        
+        mostrarErroCancelar(mensagemErro);
     }
 });
 
 function mostrarErroCancelar(mensagem) {
     const errorDiv = document.getElementById('cancelar-error-message');
-    errorDiv.textContent = mensagem;
+    
+    // Tratar arrays e objetos
+    if (Array.isArray(mensagem)) {
+        errorDiv.textContent = mensagem.map(err => err.msg || err).join(', ');
+    } else if (typeof mensagem === 'object') {
+        errorDiv.textContent = JSON.stringify(mensagem);
+    } else {
+        errorDiv.textContent = mensagem;
+    }
+    
     errorDiv.style.display = 'block';
+    
+    // Esconder automaticamente após 5 segundos
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
 }
 
 // Configurar estilo dos modais
