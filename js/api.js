@@ -4,30 +4,49 @@ const API_CONFIG = {
     ENDPOINTS: {
         // Auth
         LOGIN: '/auth/login',
-        MEDICO_LOGIN: '/auth/login/medico',
-        ME: '/auth/me',
+        LOGIN_CRM: '/auth/login/crm',
+        ALTERAR_SENHA: '/auth/alterar-senha',
+        VERIFICAR_TOKEN: '/auth/verificar-token',
         
         // Pacientes
         PACIENTE_CADASTRO: '/pacientes/cadastro',
-        PACIENTE_PERFIL: '/pacientes/perfil',
+        PACIENTE_PERFIL: (id) => `/pacientes/perfil/${id}`,
         PACIENTE_CONSULTAS: '/pacientes/consultas',
-        PACIENTE_HORARIOS: (medicoId) => `/pacientes/medicos/${medicoId}/horarios-disponiveis`,
+        PACIENTE_CONSULTAS_LISTAR: (id) => `/pacientes/consultas/${id}`,
+        PACIENTE_CONSULTA_CANCELAR: (id) => `/pacientes/consultas/${id}`,
+        PACIENTE_CONSULTA_REAGENDAR: (id) => `/pacientes/consultas/${id}/reagendar`,
+        PACIENTE_MEDICOS: '/pacientes/medicos',
+        PACIENTE_HORARIOS_DISPONIVEIS: (id) => `/pacientes/medicos/${id}/horarios-disponiveis`,
+        PACIENTE_ESPECIALIDADES: '/pacientes/especialidades',
+        PACIENTE_PLANOS_SAUDE: '/pacientes/planos-saude',
         
         // Médicos
-        MEDICO_PERFIL: '/medicos/perfil',
-        MEDICO_CONSULTAS: '/medicos/consultas',
-        MEDICO_CONSULTAS_HOJE: '/medicos/consultas/hoje',
+        MEDICO_PERFIL: (id) => `/medicos/perfil/${id}`,
+        MEDICO_CONSULTAS: (id) => `/medicos/consultas/${id}`,
+        MEDICO_CONSULTAS_HOJE: (id) => `/medicos/consultas/hoje/${id}`,
+        MEDICO_CONSULTA_STATUS: (id) => `/medicos/consultas/${id}/status`,
         MEDICO_HORARIOS: '/medicos/horarios',
-        MEDICO_BLOQUEIOS: '/medicos/bloqueios',
-        MEDICO_ESPECIALIDADES: '/medicos/especialidades',
+        MEDICO_HORARIOS_LISTAR: (id) => `/medicos/horarios/${id}`,
+        MEDICO_HORARIO_EXCLUIR: (id) => `/medicos/horarios/${id}`,
+        MEDICO_OBSERVACOES: '/medicos/observacoes',
+        MEDICO_OBSERVACAO_ATUALIZAR: (id) => `/medicos/observacoes/${id}`,
+        MEDICO_OBSERVACAO_VER: (consultaId) => `/medicos/observacoes/${consultaId}`,
         
         // Admin
         ADMIN_DASHBOARD: '/admin/dashboard',
         ADMIN_MEDICOS: '/admin/medicos',
+        ADMIN_MEDICO: (id) => `/admin/medicos/${id}`,
         ADMIN_PACIENTES: '/admin/pacientes',
-        ADMIN_CONVENIOS: '/admin/convenios',
+        ADMIN_PACIENTE: (id) => `/admin/pacientes/${id}`,
+        ADMIN_PACIENTE_DESBLOQUEAR: (id) => `/admin/pacientes/${id}/desbloquear`,
+        ADMIN_PLANOS_SAUDE: '/admin/planos-saude',
+        ADMIN_PLANO_SAUDE: (id) => `/admin/planos-saude/${id}`,
         ADMIN_ESPECIALIDADES: '/admin/especialidades',
-        ADMIN_CONSULTAS: '/admin/consultas'
+        ADMIN_OBSERVACAO: (id) => `/admin/observacoes/${id}`,
+        ADMIN_RELATORIO_CONSULTAS_MEDICO: '/admin/relatorios/consultas-por-medico',
+        ADMIN_RELATORIO_CONSULTAS_ESPECIALIDADE: '/admin/relatorios/consultas-por-especialidade',
+        ADMIN_RELATORIO_CANCELAMENTOS: '/admin/relatorios/cancelamentos',
+        ADMIN_RELATORIO_PACIENTES_FREQUENTES: '/admin/relatorios/pacientes-frequentes'
     }
 };
 
@@ -36,18 +55,38 @@ class APIClient {
     constructor() {
         this.baseURL = API_CONFIG.BASE_URL;
         this.token = localStorage.getItem('token');
+        this.userType = localStorage.getItem('user_type');
+        this.userId = localStorage.getItem('user_id');
     }
 
-    // Armazena o token
-    setToken(token) {
+    // Armazena o token e informações do usuário
+    setToken(token, userType, userId) {
         this.token = token;
+        this.userType = userType;
+        this.userId = userId;
         localStorage.setItem('token', token);
+        localStorage.setItem('user_type', userType);
+        localStorage.setItem('user_id', userId);
     }
 
-    // Remove o token
+    // Remove o token e informações do usuário
     clearToken() {
         this.token = null;
+        this.userType = null;
+        this.userId = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('user_type');
+        localStorage.removeItem('user_id');
+    }
+
+    // Obtém o tipo de usuário
+    getUserType() {
+        return this.userType || localStorage.getItem('user_type');
+    }
+
+    // Obtém o ID do usuário
+    getUserId() {
+        return this.userId || localStorage.getItem('user_id');
     }
 
     // Headers padrão
@@ -145,19 +184,60 @@ class APIClient {
                 throw new Error('Sessão expirada. Faça login novamente.');
             }
 
+            // Tratar erro de email duplicado
+            if (response.status === 409) {
+                throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.');
+            }
+
+            // Tratar erro de CPF duplicado
+            if (response.status === 400 && data.detail && data.detail.includes('CPF')) {
+                throw new Error('Este CPF já está cadastrado no sistema.');
+            }
+
             throw new Error(data.detail || 'Erro na requisição');
         }
 
         return data;
     }
 
-    // Login
+    // Login com email e senha
     async login(email, senha) {
         const response = await this.post(API_CONFIG.ENDPOINTS.LOGIN, { email, senha }, false);
         if (response.access_token) {
-            this.setToken(response.access_token);
+            this.setToken(response.access_token, response.user_type, response.user_id);
         }
         return response;
+    }
+
+    // Login de médico com CRM
+    async loginCRM(crm, senha) {
+        const response = await this.post(API_CONFIG.ENDPOINTS.LOGIN_CRM, { crm, senha }, false);
+        if (response.access_token) {
+            this.setToken(response.access_token, response.user_type, response.user_id);
+        }
+        return response;
+    }
+
+    // Alterar senha
+    async alterarSenha(senhaAtual, senhaNova) {
+        const userType = this.getUserType();
+        const userId = this.getUserId();
+        return await this.post(API_CONFIG.ENDPOINTS.ALTERAR_SENHA, {
+            user_type: userType,
+            user_id: userId,
+            senha_atual: senhaAtual,
+            senha_nova: senhaNova
+        });
+    }
+
+    // Verificar token
+    async verificarToken() {
+        try {
+            return await this.get(API_CONFIG.ENDPOINTS.VERIFICAR_TOKEN);
+        } catch (error) {
+            this.clearToken();
+            return null;
+        }
     }
 
     // Logout
@@ -173,7 +253,25 @@ class APIClient {
 
     // Obter dados do usuário atual
     async getCurrentUser() {
-        return await this.get(API_CONFIG.ENDPOINTS.ME);
+        const userType = this.getUserType();
+        const userId = this.getUserId();
+        
+        if (!userType || !userId) {
+            throw new Error('Usuário não autenticado');
+        }
+
+        // Endpoint dinâmico baseado no tipo de usuário
+        let endpoint;
+        if (userType === 'paciente') {
+            endpoint = API_CONFIG.ENDPOINTS.PACIENTE_PERFIL(userId);
+        } else if (userType === 'medico') {
+            endpoint = API_CONFIG.ENDPOINTS.MEDICO_PERFIL(userId);
+        } else if (userType === 'administrador') {
+            // Admin não tem perfil próprio, retorna dados básicos
+            return { user_type: userType, user_id: userId };
+        }
+
+        return await this.get(endpoint);
     }
 }
 
@@ -209,9 +307,64 @@ function formatTime(timeString) {
     return timeString.substring(0, 5); // HH:MM
 }
 
+// Função para formatar data e hora juntas
+function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return '';
+    const date = new Date(dateTimeString);
+    return `${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// Função para converter data e hora para formato ISO (data_hora_inicio/fim)
+function toISODateTime(date, time) {
+    // date: "2025-11-02", time: "14:00"
+    return `${date}T${time}:00`;
+}
+
+// Função para extrair data de datetime ISO
+function extractDate(dateTimeString) {
+    if (!dateTimeString) return '';
+    return dateTimeString.split('T')[0];
+}
+
+// Função para extrair hora de datetime ISO
+function extractTime(dateTimeString) {
+    if (!dateTimeString) return '';
+    const timePart = dateTimeString.split('T')[1];
+    return timePart ? timePart.substring(0, 5) : '';
+}
+
+// Função para calcular hora fim (adiciona 30 minutos por padrão)
+function calcularHoraFim(horaInicio, duracaoMinutos = 30) {
+    const [hora, minuto] = horaInicio.split(':').map(Number);
+    const totalMinutos = hora * 60 + minuto + duracaoMinutos;
+    const novaHora = Math.floor(totalMinutos / 60);
+    const novoMinuto = totalMinutos % 60;
+    return `${String(novaHora).padStart(2, '0')}:${String(novoMinuto).padStart(2, '0')}`;
+}
+
 // Verificar autenticação ao carregar páginas protegidas
 function requireAuth() {
     if (!api.isAuthenticated()) {
         window.location.href = '/index.html';
     }
+}
+
+// Verificar tipo de usuário
+function requireUserType(expectedType) {
+    const userType = api.getUserType();
+    if (!userType || userType !== expectedType) {
+        showMessage('Acesso não autorizado', 'error');
+        setTimeout(() => {
+            window.location.href = '/index.html';
+        }, 2000);
+    }
+}
+
+// Verificar se paciente está bloqueado
+function verificarBloqueio(paciente) {
+    if (paciente.esta_bloqueado) {
+        showMessage('Paciente bloqueado por faltas consecutivas. Entre em contato com a clínica.', 'error');
+        return true;
+    }
+    return false;
 }

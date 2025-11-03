@@ -4,6 +4,7 @@
 function maskCPF(value) {
     return value
         .replace(/\D/g, '') // Remove tudo que não é dígito
+        .slice(0, 11) // Limita a 11 dígitos
         .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto após os primeiros 3 dígitos
         .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto após os próximos 3 dígitos
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2'); // Coloca um hífen antes dos últimos 2 dígitos
