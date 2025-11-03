@@ -66,7 +66,7 @@
         }
 
         const token = localStorage.getItem('token');
-        const userRole = localStorage.getItem('userRole');
+        const userType = localStorage.getItem('user_type');
 
         // Se não tem token, redirecionar para login
         if (!token) {
@@ -75,9 +75,17 @@
             return;
         }
 
+        // Mapear user_type para role (administrador -> admin, paciente -> paciente, medico -> medico)
+        const roleMap = {
+            'administrador': 'admin',
+            'paciente': 'paciente',
+            'medico': 'medico'
+        };
+        const userRole = roleMap[userType] || userType;
+
         // Se o perfil não corresponde, redirecionar para login correto
         if (userRole !== requiredRole) {
-            console.warn(`⚠️ Acesso negado: Perfil esperado '${requiredRole}', encontrado '${userRole}'`);
+            console.warn(`⚠️ Acesso negado: Perfil esperado '${requiredRole}', encontrado '${userRole}' (user_type: ${userType})'`);
             redirectToLogin(requiredRole);
             return;
         }
@@ -90,7 +98,8 @@
             if (tokenData.exp && tokenData.exp < now) {
                 console.warn('⚠️ Token expirado');
                 localStorage.removeItem('token');
-                localStorage.removeItem('userRole');
+                localStorage.removeItem('user_type');
+                localStorage.removeItem('user_id');
                 redirectToLogin(requiredRole);
                 return;
             }
@@ -136,10 +145,20 @@
      * Função para logout (disponível globalmente)
      */
     window.logout = function() {
-        const userRole = localStorage.getItem('userRole');
+        const userType = localStorage.getItem('user_type');
         localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
+        localStorage.removeItem('user_type');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('userName');
         sessionStorage.removeItem('redirectAfterLogin');
+        
+        // Mapear user_type para role
+        const roleMap = {
+            'administrador': 'admin',
+            'paciente': 'paciente',
+            'medico': 'medico'
+        };
+        const userRole = roleMap[userType] || userType;
         
         const loginPage = ROUTES[userRole]?.loginPage || '/index.html';
         window.location.href = loginPage;

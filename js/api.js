@@ -158,12 +158,19 @@ class APIClient {
     }
 
     // DELETE request
-    async delete(endpoint) {
+    async delete(endpoint, data = null) {
         try {
-            const response = await fetch(`${this.baseURL}${endpoint}`, {
+            const options = {
                 method: 'DELETE',
                 headers: this.getHeaders()
-            });
+            };
+
+            // Adiciona body se houver dados
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(`${this.baseURL}${endpoint}`, options);
 
             return await this.handleResponse(response);
         } catch (error) {
