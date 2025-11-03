@@ -1,3 +1,42 @@
+// Função para exibir mensagens de feedback
+function showMessage(message, type = 'success') {
+    // Remove mensagens anteriores
+    const existingAlert = document.querySelector('.alert-message');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+    
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    const alertHTML = `
+        <div class="alert-message ${alertClass}" style="
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 9999; 
+            min-width: 300px;
+            max-width: 500px;
+            padding: 15px 20px;
+            background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease-out;
+        ">
+            <strong>${type === 'success' ? '✅' : '❌'}</strong> ${message}
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHTML);
+    
+    setTimeout(() => {
+        const alert = document.querySelector('.alert-message');
+        if (alert) {
+            alert.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => alert.remove(), 300);
+        }
+    }, 4000);
+}
+
 // Carregar planos de saúde (convênios)
 async function carregarPlanosSaude() {
     console.log('🔄 Iniciando carregamento de planos de saúde...');
@@ -191,8 +230,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Inicializa o botão como HABILITADO (validação acontece no submit)
     submitButton.disabled = false;
 
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', async function (event) {
         event.preventDefault();
+        event.stopPropagation(); // Evita propagação que causa mudança de URL
         console.log('📝 Formulário submetido');
         
         // Validar campos obrigatórios manualmente
@@ -257,70 +297,89 @@ document.addEventListener('DOMContentLoaded', async function () {
         btnText.style.display = 'none';
         btnLoading.style.display = 'inline';
 
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-
         // Formatar dados para o backend
-        data.cpf = cpf;
-        data.telefone = telefone;
-        data.data_nascimento = dataNascimento; // type="date" já retorna YYYY-MM-DD
-        delete data.dataNascimento;
-        delete data.confirmarSenha; // Não enviar confirmação
-        
-        // Adicionar id_plano_saude_fk
         const convenioValue = document.getElementById('convenio').value;
-        data.id_plano_saude_fk = convenioValue ? parseInt(convenioValue) : null;
+        const endereco = document.getElementById('endereco').value.trim();
+        const cidade = document.getElementById('cidade').value.trim();
+        const estado = document.getElementById('estado').value;
+        const cep = document.getElementById('cep').value.replace(/\D/g, '');
+        const numeroCarteirinha = document.getElementById('numeroCarteirinha').value.trim();
         
-        console.log('📤 Dados a serem enviados:', data);
+        const dadosCadastro = {
+            nome: nome,
+            cpf: cpf,
+            email: email,
+            senha: senha,
+            telefone: telefone,
+            data_nascimento: dataNascimento,
+            id_plano_saude_fk: convenioValue ? parseInt(convenioValue) : null,
+            endereco: endereco || null,
+            cidade: cidade || null,
+            estado: estado || null,
+            cep: cep || null,
+            numero_carteirinha: numeroCarteirinha || null
+        };
+        
+        console.log('📤 Dados a serem enviados:', dadosCadastro);
 
-        // Fazer requisição para o endpoint correto
-        const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PACIENTE_CADASTRO}`;
-        console.log('📡 Enviando para:', url);
-        
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => {
+        try {
+            // Usar a instância global da API
+            const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PACIENTE_CADASTRO}`;
+            console.log('📡 Enviando POST para:', url);
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(dadosCadastro)
+            });
+
+            console.log('📥 Status da resposta:', response.status);
+            
+            const resultado = await response.json();
+            console.log('📦 Resposta do servidor:', resultado);
+            
             if (!response.ok) {
-                return response.json().then(err => Promise.reject(err));
+                throw resultado;
             }
-            return response.json();
-        })
-        .then(response => {
-            console.log('✅ Cadastro realizado com sucesso:', response);
-            alert('Cadastro realizado com sucesso! Você será redirecionado para a página de login.');
+
+            // Sucesso!
+            console.log('✅ Cadastro realizado com sucesso!');
+            showMessage('Cadastro realizado com sucesso! Redirecionando para o login...', 'success');
+            
             setTimeout(() => {
                 window.location.href = 'login.html';
-            }, 500);
-        })
-        .catch(error => {
+            }, 1500);
+            
+        } catch (error) {
             console.error('❌ Erro no cadastro:', error);
             
-            // Tratar erro corretamente (error é o JSON retornado)
-            if (error && error.detail) {
-                const detail = error.detail;
-                if (detail.includes("email")) {
-                    mostrarErro('email', 'Este email já está cadastrado. Tente fazer login.');
-                    validity.email = false;
-                } else if (detail.includes("CPF")) {
-                    mostrarErro('cpf', 'Este CPF já está cadastrado.');
-                    validity.cpf = false;
-                } else {
-                    alert(`Erro no cadastro: ${detail}`);
-                }
-            } else {
-                alert('Ocorreu um erro inesperado. Tente novamente.');
-            }
-        })
-        .finally(() => {
+            // Resetar botão
             submitButton.disabled = false;
             btnText.style.display = 'inline';
             btnLoading.style.display = 'none';
+            
+            // Tratar erros específicos
+            if (error && error.detail) {
+                const detail = error.detail;
+                
+                if (detail.includes("Email já cadastrado") || detail.includes("email")) {
+                    mostrarErro('email', 'Este email já está cadastrado. Tente fazer login.');
+                    validity.email = false;
+                    showMessage('Email já cadastrado no sistema', 'error');
+                } else if (detail.includes("CPF já cadastrado") || detail.includes("CPF")) {
+                    mostrarErro('cpf', 'Este CPF já está cadastrado.');
+                    validity.cpf = false;
+                    showMessage('CPF já cadastrado no sistema', 'error');
+                } else {
+                    showMessage(`Erro: ${detail}`, 'error');
+                }
+            } else {
+                showMessage('Erro ao cadastrar. Verifique os dados e tente novamente.', 'error');
+            }
+            
             checkFormValidity();
-        });
+        }
     });
 });
