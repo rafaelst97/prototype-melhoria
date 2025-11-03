@@ -9,9 +9,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function carregarDadosDashboard() {
     try {
         const pacienteId = api.getUserId();
+        console.log('📊 Carregando dashboard para paciente ID:', pacienteId);
+        
+        if (!pacienteId) {
+            throw new Error('ID do paciente não encontrado. Faça login novamente.');
+        }
         
         // Carregar perfil do paciente
+        console.log('📡 Buscando perfil...');
         const perfil = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL(pacienteId));
+        console.log('✅ Perfil carregado:', perfil);
         
         // Atualizar nome do usuário
         const userNameElement = document.getElementById('userName');
@@ -20,7 +27,9 @@ async function carregarDadosDashboard() {
         }
         
         // Carregar consultas
+        console.log('📡 Buscando consultas...');
         const consultas = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS_LISTAR(pacienteId));
+        console.log('✅ Consultas carregadas:', consultas);
         
         // Renderizar próximas consultas
         renderizarProximasConsultas(consultas);
@@ -28,9 +37,27 @@ async function carregarDadosDashboard() {
         // Renderizar resumo
         renderizarResumo(consultas, perfil);
         
+        console.log('✅ Dashboard carregado com sucesso!');
+        
     } catch (error) {
-        console.error('Erro ao carregar dados do dashboard:', error);
-        showMessage('Erro ao carregar dados. Tente recarregar a página.', 'error');
+        console.error('❌ Erro ao carregar dados do dashboard:', error);
+        console.error('Detalhes do erro:', error.message, error.stack);
+        
+        // Mostrar mensagem específica baseada no erro
+        let mensagem = 'Erro ao carregar dados. ';
+        if (error.message) {
+            mensagem += error.message;
+        } else {
+            mensagem += 'Tente recarregar a página.';
+        }
+        
+        showMessage(mensagem, 'error');
+        
+        // Exibir mensagem nas tabelas também
+        const tbody = document.getElementById('proximas-consultas-tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color: red;">Erro ao carregar consultas. Recarregue a página.</td></tr>';
+        }
     }
 }
 
