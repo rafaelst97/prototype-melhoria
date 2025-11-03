@@ -6,6 +6,7 @@
     <title>Minhas Consultas - Clínica Saúde+</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
+    <script src="../js/api.js"></script>
     <script src="../js/auth-guard.js"></script>
 </head>
 <body>
@@ -44,23 +45,8 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>25/10/2025 14:00</td>
-                                <td>Cardiologia</td>
-                                <td>Dr. João Silva - CRM 12345</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Confirmada</span></td>
-                                <td>
-                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Remarcar</button>
-                                    <button class="btn btn-tertiary" style="padding: 5px 10px;">Cancelar</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>02/11/2025 10:30</td>
-                                <td>Ortopedia</td>
-                                <td>Dra. Maria Santos - CRM 54321</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Confirmada</span></td>
-                                <td>
-                                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;">Remarcar</button>
-                                    <button class="btn btn-tertiary" style="padding: 5px 10px;">Cancelar</button>
+                                <td colspan="5" class="text-center">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando consultas...
                                 </td>
                             </tr>
                         </tbody>
@@ -84,28 +70,9 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>15/10/2025 09:00</td>
-                                <td>Clínico Geral</td>
-                                <td>Dr. Pedro Oliveira - CRM 98765</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Realizada</span></td>
-                            </tr>
-                            <tr>
-                                <td>05/10/2025 15:30</td>
-                                <td>Oftalmologia</td>
-                                <td>Dra. Ana Costa - CRM 45678</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Realizada</span></td>
-                            </tr>
-                            <tr>
-                                <td>20/09/2025 11:00</td>
-                                <td>Dermatologia</td>
-                                <td>Dr. Carlos Mendes - CRM 78901</td>
-                                <td><span style="color: var(--accent-color);"><i class="fas fa-times-circle"></i> Cancelada</span></td>
-                            </tr>
-                            <tr>
-                                <td>10/09/2025 14:00</td>
-                                <td>Cardiologia</td>
-                                <td>Dr. João Silva - CRM 12345</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Realizada</span></td>
+                                <td colspan="4" class="text-center">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando histórico...
+                                </td>
                             </tr>
                         </tbody>
                     </table>

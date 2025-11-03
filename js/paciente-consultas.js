@@ -13,14 +13,24 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function carregarConsultas() {
     try {
         const pacienteId = api.getUserId();
+        console.log('🔄 Carregando consultas do paciente:', pacienteId);
+        
         const response = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS_LISTAR(pacienteId));
         consultas = response;
+        
+        console.log('✅ Consultas carregadas:', consultas);
         
         renderizarConsultasFuturas();
         renderizarHistorico();
     } catch (error) {
-        console.error('Erro ao carregar consultas:', error);
+        console.error('❌ Erro ao carregar consultas:', error);
         showMessage('Erro ao carregar consultas. Tente novamente.', 'error');
+        
+        // Mostrar mensagem de erro nas tabelas
+        document.querySelector('.card:first-of-type tbody').innerHTML = 
+            '<tr><td colspan="5" class="text-center" style="color: red;">Erro ao carregar consultas. Recarregue a página.</td></tr>';
+        document.querySelector('.card:nth-of-type(2) tbody').innerHTML = 
+            '<tr><td colspan="4" class="text-center" style="color: red;">Erro ao carregar histórico. Recarregue a página.</td></tr>';
     }
 }
 
@@ -30,7 +40,7 @@ function renderizarConsultasFuturas() {
     hoje.setHours(0, 0, 0, 0);
     
     const consultasFuturas = consultas.filter(c => {
-        const dataConsulta = new Date(c.data_hora_inicio);
+        const dataConsulta = new Date(c.data_hora_inicio || c.data_hora);
         return dataConsulta >= hoje && ['agendada', 'confirmada'].includes(c.status);
     });
     
@@ -39,20 +49,25 @@ function renderizarConsultasFuturas() {
         return;
     }
     
-    tbody.innerHTML = consultasFuturas.map(consulta => `
-        <tr>
-            <td>${formatDateTime(consulta.data_hora_inicio)}</td>
-            <td>${consulta.medico?.especialidade?.nome || 'N/A'}</td>
-            <td>${consulta.medico?.nome || 'N/A'} - CRM ${consulta.medico?.crm || ''}</td>
-            <td>${renderizarStatusBadge(consulta.status)}</td>
-            <td>
-                <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" 
-                        onclick="abrirModalReagendar(${consulta.id})">Reagendar</button>
-                <button class="btn btn-tertiary" style="padding: 5px 10px;" 
-                        onclick="abrirModalCancelar(${consulta.id})">Cancelar</button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = consultasFuturas.map(consulta => {
+        // Suporta tanto 'id' quanto 'id_consulta'
+        const consultaId = consulta.id_consulta || consulta.id;
+        const dataHora = consulta.data_hora_inicio || consulta.data_hora;
+        return `
+            <tr>
+                <td>${formatDateTime(dataHora)}</td>
+                <td>${consulta.medico?.especialidade?.nome || 'N/A'}</td>
+                <td>${consulta.medico?.nome || 'N/A'} - CRM ${consulta.medico?.crm || ''}</td>
+                <td>${renderizarStatusBadge(consulta.status)}</td>
+                <td>
+                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" 
+                            onclick="abrirModalReagendar(${consultaId})">Reagendar</button>
+                    <button class="btn btn-tertiary" style="padding: 5px 10px;" 
+                            onclick="abrirModalCancelar(${consultaId})">Cancelar</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function renderizarHistorico() {
@@ -61,23 +76,26 @@ function renderizarHistorico() {
     hoje.setHours(0, 0, 0, 0);
     
     const consultasPassadas = consultas.filter(c => {
-        const dataConsulta = new Date(c.data_hora_inicio);
+        const dataConsulta = new Date(c.data_hora_inicio || c.data_hora);
         return dataConsulta < hoje || ['cancelada', 'realizada', 'faltou'].includes(c.status);
-    }).sort((a, b) => new Date(b.data_hora_inicio) - new Date(a.data_hora_inicio));
+    }).sort((a, b) => new Date(b.data_hora_inicio || b.data_hora) - new Date(a.data_hora_inicio || a.data_hora));
     
     if (consultasPassadas.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma consulta no histórico</td></tr>';
         return;
     }
     
-    tbody.innerHTML = consultasPassadas.map(consulta => `
-        <tr>
-            <td>${formatDateTime(consulta.data_hora_inicio)}</td>
-            <td>${consulta.medico?.especialidade?.nome || 'N/A'}</td>
-            <td>${consulta.medico?.nome || 'N/A'} - CRM ${consulta.medico?.crm || ''}</td>
-            <td>${renderizarStatusBadge(consulta.status)}</td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = consultasPassadas.map(consulta => {
+        const dataHora = consulta.data_hora_inicio || consulta.data_hora;
+        return `
+            <tr>
+                <td>${formatDateTime(dataHora)}</td>
+                <td>${consulta.medico?.especialidade?.nome || 'N/A'}</td>
+                <td>${consulta.medico?.nome || 'N/A'} - CRM ${consulta.medico?.crm || ''}</td>
+                <td>${renderizarStatusBadge(consulta.status)}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function renderizarStatusBadge(status) {
@@ -105,11 +123,26 @@ function formatDateTime(isoString) {
 
 // ==================== REAGENDAMENTO ====================
 async function abrirModalReagendar(consultaId) {
-    consultaAtual = consultas.find(c => c.id === consultaId);
-    if (!consultaAtual) return;
+    console.log('📅 Abrindo modal de reagendamento para consulta ID:', consultaId);
+    console.log('📋 Consultas disponíveis:', consultas);
+    
+    // Suportar tanto 'id' quanto 'id_consulta'
+    consultaAtual = consultas.find(c => (c.id_consulta || c.id) === consultaId);
+    
+    if (!consultaAtual) {
+        console.error('❌ Consulta não encontrada:', consultaId);
+        console.error('IDs disponíveis:', consultas.map(c => c.id_consulta || c.id));
+        showMessage('Erro: Consulta não encontrada', 'error');
+        return;
+    }
+    
+    console.log('✅ Consulta encontrada:', consultaAtual);
+    
+    // Suportar ambos os formatos de data
+    const dataHoraConsulta = consultaAtual.data_hora_inicio || consultaAtual.data_hora;
     
     // Verificar se pode reagendar (RN1 - 24h)
-    const dataConsulta = new Date(consultaAtual.data_hora_inicio);
+    const dataConsulta = new Date(dataHoraConsulta);
     const agora = new Date();
     const diferencaHoras = (dataConsulta - agora) / (1000 * 60 * 60);
     
@@ -120,7 +153,7 @@ async function abrirModalReagendar(consultaId) {
     
     // Preencher informações da consulta atual
     document.getElementById('detalhes-consulta-atual').innerHTML = `
-        ${formatDateTime(consultaAtual.data_hora_inicio)}<br>
+        ${formatDateTime(dataHoraConsulta)}<br>
         ${consultaAtual.medico?.nome} - ${consultaAtual.medico?.especialidade?.nome}
     `;
     
@@ -130,7 +163,7 @@ async function abrirModalReagendar(consultaId) {
     document.getElementById('nova-data').min = amanha.toISOString().split('T')[0];
     
     // PREENCHER formulário com dados atuais da consulta
-    const dataAtualConsulta = new Date(consultaAtual.data_hora_inicio);
+    const dataAtualConsulta = new Date(dataHoraConsulta);
     const dataFormatada = dataAtualConsulta.toISOString().split('T')[0]; // YYYY-MM-DD
     const horaFormatada = String(dataAtualConsulta.getHours()).padStart(2, '0') + ':' + 
                           String(dataAtualConsulta.getMinutes()).padStart(2, '0'); // HH:MM
@@ -268,11 +301,21 @@ function mostrarErroReagendar(mensagem) {
 
 // ==================== CANCELAMENTO ====================
 function abrirModalCancelar(consultaId) {
-    consultaAtual = consultas.find(c => c.id === consultaId);
-    if (!consultaAtual) return;
+    console.log('🗑️ Abrindo modal de cancelamento para consulta ID:', consultaId);
+    
+    // Suportar tanto 'id' quanto 'id_consulta'
+    consultaAtual = consultas.find(c => (c.id_consulta || c.id) === consultaId);
+    
+    if (!consultaAtual) {
+        console.error('❌ Consulta não encontrada:', consultaId);
+        showMessage('Erro: Consulta não encontrada', 'error');
+        return;
+    }
+    
+    const dataHoraConsulta = consultaAtual.data_hora_inicio || consultaAtual.data_hora;
     
     // Verificar se pode cancelar (RN1 - 24h)
-    const dataConsulta = new Date(consultaAtual.data_hora_inicio);
+    const dataConsulta = new Date(dataHoraConsulta);
     const agora = new Date();
     const diferencaHoras = (dataConsulta - agora) / (1000 * 60 * 60);
     
@@ -283,7 +326,7 @@ function abrirModalCancelar(consultaId) {
     
     // Preencher informações da consulta
     document.getElementById('detalhes-consulta-cancelar').innerHTML = `
-        ${formatDateTime(consultaAtual.data_hora_inicio)}<br>
+        ${formatDateTime(dataHoraConsulta)}<br>
         ${consultaAtual.medico?.nome} - ${consultaAtual.medico?.especialidade?.nome}
     `;
     
