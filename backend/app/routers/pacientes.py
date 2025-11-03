@@ -178,14 +178,21 @@ def agendar_consulta(
             detail="Médico não encontrado"
         )
     
-    # Calcular data_hora_fim (assumindo 30 minutos de duração padrão)
-    data_hora_inicio = consulta_data.data_hora_inicio
-    data_hora_fim = data_hora_inicio + timedelta(minutes=30)
+    # Obter data_hora do schema (pode vir como data_hora ou data_hora_inicio)
+    data_hora = getattr(consulta_data, 'data_hora', None) or getattr(consulta_data, 'data_hora_inicio', None)
+    
+    if not data_hora:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data e hora da consulta são obrigatórias"
+        )
+    
+    data_hora_fim = data_hora + timedelta(minutes=30)
     
     # Validar todas as regras de negócio
     pode_agendar, mensagem = ValidadorAgendamento.validar_novo_agendamento(
         db, paciente_id, consulta_data.id_medico_fk,
-        data_hora_inicio, data_hora_fim
+        data_hora, data_hora_fim
     )
     
     if not pode_agendar:
@@ -194,10 +201,9 @@ def agendar_consulta(
             detail=mensagem
         )
     
-    # Criar consulta
+    # Criar consulta (modelo usa apenas 'data_hora', não 'data_hora_inicio')
     nova_consulta = Consulta(
-        data_hora_inicio=data_hora_inicio,
-        data_hora_fim=data_hora_fim,
+        data_hora=data_hora,
         status="agendada",
         id_paciente_fk=paciente_id,
         id_medico_fk=consulta_data.id_medico_fk
@@ -230,7 +236,7 @@ def listar_consultas(paciente_id: int, db: Session = Depends(get_db)):
         joinedload(Consulta.paciente)
     ).filter(
         Consulta.id_paciente_fk == paciente_id
-    ).order_by(Consulta.data_hora_inicio.desc()).all()
+    ).order_by(Consulta.data_hora.desc()).all()
     
     return consultas
 
@@ -335,13 +341,20 @@ def reagendar_consulta(
             detail=mensagem
         )
     
-    # Nova data/hora
-    nova_data_hora_inicio = reagendamento_data.nova_data_hora_inicio
-    nova_data_hora_fim = nova_data_hora_inicio + timedelta(minutes=30)
+    # Nova data/hora (suporta ambos os nomes de campo)
+    nova_data_hora = getattr(reagendamento_data, 'nova_data_hora', None) or getattr(reagendamento_data, 'nova_data_hora_inicio', None) or getattr(reagendamento_data, 'data_hora_inicio', None)
+    
+    if not nova_data_hora:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nova data e hora são obrigatórias"
+        )
+    
+    nova_data_hora_fim = nova_data_hora + timedelta(minutes=30)
     
     # Validar horário de trabalho
     no_horario, msg_horario = RegraConsulta.validar_horario_trabalho_medico(
-        db, consulta.id_medico_fk, nova_data_hora_inicio
+        db, consulta.id_medico_fk, nova_data_hora
     )
     if not no_horario:
         raise HTTPException(
@@ -351,7 +364,7 @@ def reagendar_consulta(
     
     # Validar conflito (ignorando a própria consulta)
     sem_conflito, msg_conflito = RegraConsulta.validar_conflito_horario_medico(
-        db, consulta.id_medico_fk, nova_data_hora_inicio, nova_data_hora_fim,
+        db, consulta.id_medico_fk, nova_data_hora, nova_data_hora_fim,
         consulta_id_ignorar=consulta_id
     )
     if not sem_conflito:
@@ -360,9 +373,8 @@ def reagendar_consulta(
             detail=msg_conflito
         )
     
-    # Reagendar
-    consulta.data_hora_inicio = nova_data_hora_inicio
-    consulta.data_hora_fim = nova_data_hora_fim
+    # Reagendar (modelo usa apenas 'data_hora', não 'data_hora_inicio')
+    consulta.data_hora = nova_data_hora
     db.commit()
     db.refresh(consulta)
     
