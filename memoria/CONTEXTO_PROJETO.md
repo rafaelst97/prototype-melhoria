@@ -30,6 +30,21 @@
 
 A **Clínica Saúde+** é uma clínica de especialidades médicas que atende pacientes de forma particular e por convênios.
 
+### ⚠️ Importante: Ambiente de Desenvolvimento
+
+Este projeto utiliza **Docker** para gerenciar toda a infraestrutura:
+
+- 🐳 **Docker Compose**: Orquestra 4 containers
+- 🗄️ **PostgreSQL 15**: Banco de dados via Docker (container `clinica_db`)
+- 🚀 **Backend**: FastAPI em container Python (container `clinica_backend`)
+- 🌐 **Frontend**: Nginx servindo arquivos estáticos (container `clinica_frontend`)
+- 🔧 **pgAdmin**: Interface web para administração do banco (container `clinica_pgadmin`)
+
+**Comando para iniciar:** `docker-compose up -d`  
+**Porta do Backend:** `http://localhost:8000`  
+**Porta do Frontend:** `http://localhost:80`  
+**Porta do pgAdmin:** `http://localhost:5050`
+
 #### Problemas Atuais
 O agendamento atual é manual (telefone ou presencial) e registrado em agenda física, causando:
 
@@ -84,9 +99,12 @@ Fornecer um sistema que permita aos pacientes agendarem consultas de forma simpl
 
 #### **Backend**
 - **Python (FastAPI)**: Lógica de negócio, API REST, Processamento de dados
+- **Container Docker**: `clinica_backend` (Python 3.11)
 
 #### **Banco de Dados**
-- **PostgreSQL**: Armazenamento de dados, Consultas SQL, Persistência
+- **PostgreSQL 15**: Armazenamento de dados, Consultas SQL, Persistência
+- **Container Docker**: `clinica_db` (postgres:15-alpine)
+- **Encoding**: UTF-8 (client_encoding=utf8)
 
 ### Fluxos de Comunicação
 
@@ -399,20 +417,50 @@ Usuario (Classe Base)
 - **Uvicorn**: Servidor ASGI
 
 ### Banco de Dados
-- **PostgreSQL 15**: Banco relacional
-- **UTF-8 Encoding**: Suporte a caracteres especiais
+- **PostgreSQL 15**: Banco relacional via Docker
+- **UTF-8 Encoding**: Suporte a caracteres especiais (client_encoding=utf8)
+- **Imagem Docker**: postgres:15-alpine
+- **Porta**: 5432 (mapeada para localhost)
+- **Credenciais**:
+  - Database: `clinica_saude`
+  - User: `clinica_user`
+  - Password: `clinica_password`
 
-### Infraestrutura
-- **Docker**: Containerização
+### Infraestrutura Docker
+- **Docker**: Containerização de toda a aplicação
 - **Docker Compose**: Orquestração de containers
-- **Nginx**: Servidor web para frontend
-- **pgAdmin**: Interface de administração do PostgreSQL
+- **Nginx**: Servidor web para frontend (container)
+- **pgAdmin**: Interface de administração do PostgreSQL (container)
 
-### Containers Docker
-1. **clinica_db**: PostgreSQL 15
-2. **clinica_backend**: FastAPI application
-3. **clinica_frontend**: Nginx serving static files
-4. **clinica_pgadmin**: pgAdmin web interface
+### Containers Docker (4 containers)
+
+| Container | Imagem | Porta | Função |
+|-----------|--------|-------|--------|
+| **clinica_db** | postgres:15-alpine | 5432 | Banco de dados PostgreSQL |
+| **clinica_backend** | Python 3.11 | 8000 | API FastAPI |
+| **clinica_frontend** | nginx:alpine | 80 | Frontend estático |
+| **clinica_pgadmin** | dpage/pgadmin4 | 5050 | Administração do banco |
+
+#### Comandos Docker Úteis
+```bash
+# Iniciar todos os containers
+docker-compose up -d
+
+# Ver logs do backend
+docker-compose logs -f backend
+
+# Ver logs do banco
+docker-compose logs -f db
+
+# Parar todos os containers
+docker-compose down
+
+# Acessar PostgreSQL via CLI
+docker exec -it clinica_db psql -U clinica_user -d clinica_saude
+
+# Rebuild após mudanças
+docker-compose up -d --build
+```
 
 ---
 
