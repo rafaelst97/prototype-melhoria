@@ -129,8 +129,19 @@ async function abrirModalReagendar(consultaId) {
     amanha.setDate(amanha.getDate() + 1);
     document.getElementById('nova-data').min = amanha.toISOString().split('T')[0];
     
-    // Limpar formulário
-    document.getElementById('form-reagendar').reset();
+    // PREENCHER formulário com dados atuais da consulta
+    const dataAtualConsulta = new Date(consultaAtual.data_hora_inicio);
+    const dataFormatada = dataAtualConsulta.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaFormatada = String(dataAtualConsulta.getHours()).padStart(2, '0') + ':' + 
+                          String(dataAtualConsulta.getMinutes()).padStart(2, '0'); // HH:MM
+    
+    // Preencher campo de data com a data atual da consulta
+    document.getElementById('nova-data').value = dataFormatada;
+    
+    // Carregar horários disponíveis para a data atual e preencher o horário
+    await carregarHorariosDisponiveisInicial(horaFormatada);
+    
+    // Limpar mensagem de erro
     document.getElementById('reagendar-error-message').style.display = 'none';
     
     // Mostrar modal
@@ -138,6 +149,48 @@ async function abrirModalReagendar(consultaId) {
     
     // Configurar listener de mudança de data
     document.getElementById('nova-data').addEventListener('change', carregarHorariosDisponiveis);
+}
+
+// Função auxiliar para carregar horários e preencher com o horário atual
+async function carregarHorariosDisponiveisInicial(horarioAtual) {
+    const data = document.getElementById('nova-data').value;
+    const selectHora = document.getElementById('nova-hora');
+    
+    if (!data || !consultaAtual) return;
+    
+    try {
+        const response = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_HORARIOS_DISPONIVEIS(
+            consultaAtual.id_medico_fk
+        ) + `?data=${data}`);
+        
+        selectHora.innerHTML = '<option value="">Selecione um horário</option>';
+        
+        // Sempre adicionar o horário atual da consulta como primeira opção
+        const optionAtual = document.createElement('option');
+        optionAtual.value = horarioAtual;
+        optionAtual.textContent = horarioAtual + ' (horário atual)';
+        optionAtual.selected = true;
+        selectHora.appendChild(optionAtual);
+        
+        if (response.length === 0) {
+            return; // Pelo menos tem o horário atual
+        }
+        
+        // Adicionar outros horários disponíveis
+        response.forEach(horario => {
+            // Evitar duplicar o horário atual
+            if (horario.hora_inicio !== horarioAtual) {
+                const option = document.createElement('option');
+                option.value = horario.hora_inicio;
+                option.textContent = horario.hora_inicio;
+                selectHora.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao carregar horários:', error);
+        // Mesmo com erro, manter o horário atual selecionado
+        selectHora.innerHTML = `<option value="${horarioAtual}" selected>${horarioAtual} (horário atual)</option>`;
+    }
 }
 
 async function carregarHorariosDisponiveis() {
@@ -148,9 +201,8 @@ async function carregarHorariosDisponiveis() {
     
     try {
         const response = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_HORARIOS_DISPONIVEIS(
-            consultaAtual.id_medico_fk,
-            data
-        ));
+            consultaAtual.id_medico_fk
+        ) + `?data=${data}`);
         
         selectHora.innerHTML = '<option value="">Selecione um horário</option>';
         
@@ -315,12 +367,42 @@ function configurarModalStyle() {
 }
 
 // Helper para exibir mensagens
-function showMessage(message, type) {
-    if (type === 'error') {
-        alert('ERRO: ' + message);
-    } else {
-        alert(message);
+function showMessage(message, type = 'success') {
+    // Remove mensagens anteriores
+    const existingAlert = document.querySelector('.alert-message');
+    if (existingAlert) {
+        existingAlert.remove();
     }
+    
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    const alertHTML = `
+        <div class="alert-message ${alertClass}" style="
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 99999; 
+            min-width: 300px;
+            max-width: 500px;
+            padding: 15px 20px;
+            background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease-out;
+        ">
+            <strong>${type === 'success' ? '✅' : '❌'}</strong> ${message}
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHTML);
+    
+    setTimeout(() => {
+        const alert = document.querySelector('.alert-message');
+        if (alert) {
+            alert.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => alert.remove(), 300);
+        }
+    }, 4000);
 }
 
 function calcularHoraFim(dataHoraInicio) {
