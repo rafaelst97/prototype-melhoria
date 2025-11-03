@@ -1,31 +1,23 @@
 from app.models.models import (
-    Usuario,
-    TipoUsuario,
-    Paciente,
-    Medico,
-    Admin,
     Especialidade,
-    Convenio,
-    HorarioDisponivel,
-    BloqueioHorario,
+    PlanoSaude,
+    Administrador,
+    Medico,
+    Paciente,
+    Relatorio,
+    HorarioTrabalho,
     Consulta,
-    StatusConsulta,
-    Observacao,
-    Relatorio
+    Observacao
 )
 
 __all__ = [
-    "Usuario",
-    "TipoUsuario",
-    "Paciente",
-    "Medico",
-    "Admin",
     "Especialidade",
-    "Convenio",
-    "HorarioDisponivel",
-    "BloqueioHorario",
+    "PlanoSaude",
+    "Administrador",
+    "Medico",
+    "Paciente",
+    "Relatorio",
+    "HorarioTrabalho",
     "Consulta",
-    "StatusConsulta",
-    "Observacao",
-    "Relatorio"
+    "Observacao"
 ]

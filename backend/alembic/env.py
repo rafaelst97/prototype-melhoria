@@ -60,8 +60,15 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Importar settings para obter a URL correta do banco
+    from app.config import settings
+    
+    # Sobrescrever a URL do alembic.ini com a URL do settings
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = settings.database_url
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

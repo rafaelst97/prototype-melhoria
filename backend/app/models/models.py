@@ -4,11 +4,6 @@ from datetime import datetime
 import enum
 from app.database import Base
 
-class TipoUsuario(str, enum.Enum):
-    PACIENTE = "paciente"
-    MEDICO = "medico"
-    ADMIN = "admin"
-
 class StatusConsulta(str, enum.Enum):
     AGENDADA = "agendada"
     CONFIRMADA = "confirmada"
@@ -16,139 +11,171 @@ class StatusConsulta(str, enum.Enum):
     REALIZADA = "realizada"
     FALTOU = "faltou"
 
-class Usuario(Base):
-    __tablename__ = "usuarios"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    senha_hash = Column(String(255), nullable=False)
-    nome = Column(String(255), nullable=False)
-    tipo = Column(Enum(TipoUsuario), nullable=False)
-    ativo = Column(Boolean, default=True)
-    bloqueado = Column(Boolean, default=False)
-    criado_em = Column(DateTime, default=datetime.utcnow)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relacionamentos
-    paciente = relationship("Paciente", back_populates="usuario", uselist=False)
-    medico = relationship("Medico", back_populates="usuario", uselist=False)
-    admin = relationship("Admin", back_populates="usuario", uselist=False)
+# ===== ENTIDADES CONFORME MER_Estrutura.txt =====
 
 class Especialidade(Base):
-    __tablename__ = "especialidades"
+    """
+    Entidade: ESPECIALIDADE
+    - id_especialidade (PK)
+    - nome (UK)
+    """
+    __tablename__ = "especialidade"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id_especialidade = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), unique=True, nullable=False)
-    descricao = Column(Text)
-    ativo = Column(Boolean, default=True)
     
     # Relacionamentos
     medicos = relationship("Medico", back_populates="especialidade")
 
-class Convenio(Base):
-    __tablename__ = "convenios"
+class PlanoSaude(Base):
+    """
+    Entidade: PLANO_SAUDE (Conforme MER, não Convênio)
+    - id_plano_saude (PK)
+    - nome
+    - cobertura_info
+    """
+    __tablename__ = "plano_saude"
     
-    id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String(100), unique=True, nullable=False)
-    codigo = Column(String(20), unique=True, nullable=False)
-    telefone = Column(String(20))
-    email = Column(String(255))
-    descricao = Column(Text)
-    ativo = Column(Boolean, default=True)
-    criado_em = Column(DateTime, default=datetime.utcnow)
+    id_plano_saude = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    cobertura_info = Column(Text)
     
     # Relacionamentos
-    pacientes = relationship("Paciente", back_populates="convenio")
+    pacientes = relationship("Paciente", back_populates="plano_saude")
 
-class Paciente(Base):
-    __tablename__ = "pacientes"
+class Administrador(Base):
+    """
+    Entidade: ADMINISTRADOR
+    - id_admin (PK)
+    - nome
+    - email (UK)
+    - senha_hash
+    - papel
+    """
+    __tablename__ = "administrador"
     
-    id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
-    cpf = Column(String(14), unique=True, nullable=False)
-    data_nascimento = Column(Date, nullable=False)
-    telefone = Column(String(20))
-    endereco = Column(String(255))
-    cidade = Column(String(100))
-    estado = Column(String(2))
-    cep = Column(String(10))
-    convenio_id = Column(Integer, ForeignKey("convenios.id"), nullable=True)
-    numero_carteirinha = Column(String(50))
-    faltas_consecutivas = Column(Integer, default=0)
+    id_admin = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    senha_hash = Column(String(255), nullable=False)
+    papel = Column(String(100))
     
     # Relacionamentos
-    usuario = relationship("Usuario", back_populates="paciente")
-    convenio = relationship("Convenio", back_populates="pacientes")
-    consultas = relationship("Consulta", back_populates="paciente")
+    relatorios = relationship("Relatorio", back_populates="administrador")
 
 class Medico(Base):
-    __tablename__ = "medicos"
+    """
+    Entidade: MEDICO
+    - id_medico (PK)
+    - nome
+    - cpf (UK)
+    - email (UK)
+    - senha_hash
+    - crm (UK)
+    - id_especialidade_fk (FK)
+    """
+    __tablename__ = "medico"
     
-    id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
+    id_medico = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(255), nullable=False)
+    cpf = Column(String(14), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    senha_hash = Column(String(255), nullable=False)
     crm = Column(String(20), unique=True, nullable=False)
-    especialidade_id = Column(Integer, ForeignKey("especialidades.id"))
-    telefone = Column(String(20))
-    valor_consulta = Column(Numeric(10, 2))
-    tempo_consulta = Column(Integer, default=30)  # em minutos
+    id_especialidade_fk = Column(Integer, ForeignKey("especialidade.id_especialidade"), nullable=False)
     
     # Relacionamentos
-    usuario = relationship("Usuario", back_populates="medico")
     especialidade = relationship("Especialidade", back_populates="medicos")
-    horarios_disponiveis = relationship("HorarioDisponivel", back_populates="medico")
-    bloqueios = relationship("BloqueioHorario", back_populates="medico")
+    horarios_trabalho = relationship("HorarioTrabalho", back_populates="medico")
     consultas = relationship("Consulta", back_populates="medico")
 
-class Admin(Base):
-    __tablename__ = "admins"
+class Paciente(Base):
+    """
+    Entidade: PACIENTE
+    - id_paciente (PK)
+    - nome
+    - cpf (UK)
+    - email (UK)
+    - senha_hash
+    - telefone
+    - data_nascimento
+    - esta_bloqueado
+    - id_plano_saude_fk (FK, Nullable)
+    """
+    __tablename__ = "paciente"
     
-    id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
-    cargo = Column(String(100))
+    id_paciente = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(255), nullable=False)
+    cpf = Column(String(14), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    senha_hash = Column(String(255), nullable=False)
+    telefone = Column(String(20))
+    data_nascimento = Column(Date, nullable=False)
+    esta_bloqueado = Column(Boolean, default=False)
+    id_plano_saude_fk = Column(Integer, ForeignKey("plano_saude.id_plano_saude"), nullable=True)
     
     # Relacionamentos
-    usuario = relationship("Usuario", back_populates="admin")
-    relatorios = relationship("Relatorio", back_populates="admin")
+    plano_saude = relationship("PlanoSaude", back_populates="pacientes")
+    consultas = relationship("Consulta", back_populates="paciente")
 
-class HorarioDisponivel(Base):
-    __tablename__ = "horarios_disponiveis"
+class Relatorio(Base):
+    """
+    Entidade: RELATORIO
+    - id_relatorio (PK)
+    - tipo
+    - data_geracao
+    - dados_resultado
+    - id_admin_fk (FK)
+    """
+    __tablename__ = "relatorio"
     
-    id = Column(Integer, primary_key=True, index=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id"))
+    id_relatorio = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(100), nullable=False)
+    data_geracao = Column(DateTime, default=datetime.utcnow)
+    dados_resultado = Column(Text)
+    id_admin_fk = Column(Integer, ForeignKey("administrador.id_admin"), nullable=False)
+    
+    # Relacionamentos
+    administrador = relationship("Administrador", back_populates="relatorios")
+
+class HorarioTrabalho(Base):
+    """
+    Entidade: HORARIO_TRABALHO
+    - id_horario (PK)
+    - dia_semana
+    - hora_inicio
+    - hora_fim
+    - id_medico_fk (FK)
+    """
+    __tablename__ = "horario_trabalho"
+    
+    id_horario = Column(Integer, primary_key=True, index=True)
     dia_semana = Column(Integer, nullable=False)  # 0=Segunda, 6=Domingo
     hora_inicio = Column(Time, nullable=False)
     hora_fim = Column(Time, nullable=False)
-    ativo = Column(Boolean, default=True)
+    id_medico_fk = Column(Integer, ForeignKey("medico.id_medico"), nullable=False)
     
     # Relacionamentos
-    medico = relationship("Medico", back_populates="horarios_disponiveis")
-
-class BloqueioHorario(Base):
-    __tablename__ = "bloqueios_horarios"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id"))
-    data = Column(Date, nullable=False)
-    hora_inicio = Column(Time, nullable=False)
-    hora_fim = Column(Time, nullable=False)
-    motivo = Column(Text)
-    
-    # Relacionamentos
-    medico = relationship("Medico", back_populates="bloqueios")
+    medico = relationship("Medico", back_populates="horarios_trabalho")
 
 class Consulta(Base):
-    __tablename__ = "consultas"
+    """
+    Entidade: CONSULTA
+    - id_consulta (PK)
+    - data_hora
+    - tipo
+    - status
+    - id_paciente_fk (FK)
+    - id_medico_fk (FK)
+    """
+    __tablename__ = "consulta"
     
-    id = Column(Integer, primary_key=True, index=True)
-    paciente_id = Column(Integer, ForeignKey("pacientes.id"))
-    medico_id = Column(Integer, ForeignKey("medicos.id"))
-    data = Column(Date, nullable=False)
-    hora = Column(Time, nullable=False)
-    status = Column(Enum(StatusConsulta), default=StatusConsulta.AGENDADA)
-    motivo_consulta = Column(Text)
-    criado_em = Column(DateTime, default=datetime.utcnow)
-    cancelado_em = Column(DateTime)
-    motivo_cancelamento = Column(Text)
+    id_consulta = Column(Integer, primary_key=True, index=True)
+    data_hora = Column(DateTime, nullable=False)
+    tipo = Column(String(50), default="Consulta")
+    status = Column(String(50), default="Agendada")
+    id_paciente_fk = Column(Integer, ForeignKey("paciente.id_paciente"), nullable=False)
+    id_medico_fk = Column(Integer, ForeignKey("medico.id_medico"), nullable=False)
     
     # Relacionamentos
     paciente = relationship("Paciente", back_populates="consultas")
@@ -156,26 +183,19 @@ class Consulta(Base):
     observacao = relationship("Observacao", back_populates="consulta", uselist=False)
 
 class Observacao(Base):
-    __tablename__ = "observacoes"
+    """
+    Entidade: OBSERVACAO
+    - id_observacao (PK)
+    - descricao
+    - data_criacao
+    - id_consulta_fk (FK)
+    """
+    __tablename__ = "observacao"
     
-    id = Column(Integer, primary_key=True, index=True)
-    consulta_id = Column(Integer, ForeignKey("consultas.id"), unique=True, nullable=False)
+    id_observacao = Column(Integer, primary_key=True, index=True)
     descricao = Column(Text, nullable=False)
     data_criacao = Column(DateTime, default=datetime.utcnow)
+    id_consulta_fk = Column(Integer, ForeignKey("consulta.id_consulta"), unique=True, nullable=False)
     
     # Relacionamentos
     consulta = relationship("Consulta", back_populates="observacao")
-
-class Relatorio(Base):
-    __tablename__ = "relatorios"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False)
-    tipo = Column(String(100), nullable=False)
-    data_geracao = Column(DateTime, default=datetime.utcnow)
-    dados_resultado = Column(Text)
-    parametros = Column(Text)
-    arquivo_path = Column(String(500))
-    
-    # Relacionamentos
-    admin = relationship("Admin", back_populates="relatorios")
