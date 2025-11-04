@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     requireAuth();
     requireUserType('paciente');
     
+    await carregarNomePaciente();
     await carregarConsultas();
     configurarModalStyle();
 });
@@ -533,4 +534,21 @@ function calcularHoraFim(dataHoraInicio) {
     const inicio = new Date(dataHoraInicio);
     inicio.setMinutes(inicio.getMinutes() + 30); // Consulta padrão de 30 minutos
     return inicio.toISOString().slice(0, 19);
+}
+
+// Função para carregar nome do paciente na navbar
+async function carregarNomePaciente() {
+    try {
+        const pacienteId = api.getUserId();
+        const perfil = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL(pacienteId));
+        
+        const nomeNavbar = document.querySelector('.nav-user span strong');
+        if (nomeNavbar && perfil.nome) {
+            // Pegar apenas o primeiro nome
+            const primeiroNome = perfil.nome.split(' ')[0];
+            nomeNavbar.textContent = primeiroNome;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar nome do paciente:', error);
+    }
 }

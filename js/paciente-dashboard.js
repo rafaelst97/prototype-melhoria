@@ -26,6 +26,12 @@ async function carregarDadosDashboard() {
             userNameElement.textContent = perfil.nome.split(' ')[0]; // Primeiro nome
         }
         
+        // Atualizar nome na navbar
+        const nomeNavbar = document.querySelector('.nav-user span strong');
+        if (nomeNavbar && perfil.nome) {
+            nomeNavbar.textContent = perfil.nome.split(' ')[0];
+        }
+        
         // Carregar consultas
         console.log('📡 Buscando consultas...');
         const consultas = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_CONSULTAS_LISTAR(pacienteId));

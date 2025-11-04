@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     requireAuth();
     requireUserType('paciente');
     
+    // Carregar nome do paciente na navbar
+    await carregarNomePaciente();
+    
     const especialidadeSelect = document.getElementById('especialidade');
     const medicoSelect = document.getElementById('medico');
     const dataInput = document.getElementById('data');
@@ -228,5 +231,22 @@ async function agendarConsulta(medicoId, data, horario) {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = originalText;
         }
+    }
+}
+
+// Função para carregar nome do paciente na navbar
+async function carregarNomePaciente() {
+    try {
+        const pacienteId = api.getUserId();
+        const perfil = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL(pacienteId));
+        
+        const nomeNavbar = document.querySelector('.nav-user span strong');
+        if (nomeNavbar && perfil.nome) {
+            // Pegar apenas o primeiro nome
+            const primeiroNome = perfil.nome.split(' ')[0];
+            nomeNavbar.textContent = primeiroNome;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar nome do paciente:', error);
     }
 }
