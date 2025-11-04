@@ -1,6 +1,28 @@
 // Perfil do Paciente - Integrado com API
 let pacienteId = null;
 
+// Função para formatar telefone
+function formatarTelefone(valor) {
+    // Remove tudo que não é dígito
+    valor = valor.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos
+    if (valor.length > 11) {
+        valor = valor.substring(0, 11);
+    }
+    
+    // Aplica a máscara
+    if (valor.length <= 10) {
+        // Formato: (XX) XXXX-XXXX
+        valor = valor.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+    } else {
+        // Formato: (XX) XXXXX-XXXX
+        valor = valor.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+    }
+    
+    return valor;
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     requireAuth();
     requireUserType('paciente');
@@ -20,7 +42,13 @@ async function carregarDadosPerfil() {
         document.getElementById('nome').value = perfil.nome || '';
         document.getElementById('cpf').value = perfil.cpf || '';
         document.getElementById('data-nascimento').value = perfil.data_nascimento || '';
-        document.getElementById('telefone').value = perfil.telefone || '';
+        
+        // Preencher telefone com máscara
+        const telefoneInput = document.getElementById('telefone');
+        if (telefoneInput && perfil.telefone) {
+            telefoneInput.value = formatarTelefone(perfil.telefone);
+        }
+        
         document.getElementById('email').value = perfil.email || '';
         document.getElementById('endereco').value = perfil.endereco || '';
         
@@ -145,23 +173,14 @@ function aplicarMascaraTelefone() {
     const telefoneInput = document.getElementById('telefone');
     
     if (telefoneInput) {
+        // Aplica máscara no valor inicial (se houver)
+        if (telefoneInput.value) {
+            telefoneInput.value = formatarTelefone(telefoneInput.value);
+        }
+        
+        // Aplica máscara durante a digitação
         telefoneInput.addEventListener('input', function(e) {
-            let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
-            
-            if (valor.length > 11) {
-                valor = valor.substring(0, 11);
-            }
-            
-            // Aplica a máscara
-            if (valor.length <= 10) {
-                // Formato: (XX) XXXX-XXXX
-                valor = valor.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
-            } else {
-                // Formato: (XX) XXXXX-XXXX
-                valor = valor.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
-            }
-            
-            e.target.value = valor;
+            e.target.value = formatarTelefone(e.target.value);
         });
         
         // Validação ao sair do campo
