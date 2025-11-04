@@ -11,6 +11,8 @@ const API_CONFIG = {
         // Pacientes
         PACIENTE_CADASTRO: '/pacientes/cadastro',
         PACIENTE_PERFIL: (id) => `/pacientes/perfil/${id}`,
+        PACIENTE_PERFIL_ATUALIZAR: (id) => `/pacientes/perfil/${id}`,
+        PACIENTE_ALTERAR_SENHA: (id) => `/pacientes/perfil/${id}/senha`,
         PACIENTE_CONSULTAS: '/pacientes/consultas',
         PACIENTE_CONSULTAS_LISTAR: (id) => `/pacientes/consultas/${id}`,
         PACIENTE_CONSULTA_CANCELAR: (id) => `/pacientes/consultas/${id}`,
@@ -34,6 +36,7 @@ const API_CONFIG = {
         
         // Admin
         ADMIN_DASHBOARD: '/admin/dashboard',
+        ADMIN_CONSULTAS: '/admin/consultas',
         ADMIN_MEDICOS: '/admin/medicos',
         ADMIN_MEDICO: (id) => `/admin/medicos/${id}`,
         ADMIN_PACIENTES: '/admin/pacientes',
@@ -359,7 +362,28 @@ function requireAuth() {
 // Verificar tipo de usuário
 function requireUserType(expectedType) {
     const userType = api.getUserType();
-    if (!userType || userType !== expectedType) {
+    
+    // Mapear 'admin' para 'administrador' para compatibilidade
+    const typeMap = {
+        'admin': 'administrador',
+        'administrador': 'administrador',
+        'paciente': 'paciente',
+        'medico': 'medico'
+    };
+    
+    const normalizedExpected = typeMap[expectedType] || expectedType;
+    const normalizedUserType = typeMap[userType] || userType;
+    
+    console.log('🔍 requireUserType:', {
+        expectedType,
+        userType,
+        normalizedExpected,
+        normalizedUserType,
+        match: normalizedUserType === normalizedExpected
+    });
+    
+    if (!userType || normalizedUserType !== normalizedExpected) {
+        console.warn('⚠️ Acesso negado: tipo de usuário incompatível');
         showMessage('Acesso não autorizado', 'error');
         setTimeout(() => {
             window.location.href = '/index.html';

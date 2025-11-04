@@ -68,6 +68,12 @@
         const token = localStorage.getItem('token');
         const userType = localStorage.getItem('user_type');
 
+        console.log('🔍 Auth Guard - Verificação:', {
+            requiredRole,
+            token: token ? 'presente' : 'ausente',
+            userType
+        });
+
         // Se não tem token, redirecionar para login
         if (!token) {
             console.warn('⚠️ Acesso negado: Token não encontrado');
@@ -82,6 +88,13 @@
             'medico': 'medico'
         };
         const userRole = roleMap[userType] || userType;
+
+        console.log('🔍 Comparação de roles:', {
+            userType,
+            userRole,
+            requiredRole,
+            match: userRole === requiredRole
+        });
 
         // Se o perfil não corresponde, redirecionar para login correto
         if (userRole !== requiredRole) {
