@@ -210,6 +210,10 @@ class PacienteUpdate(BaseModel):
     telefone: Optional[str] = None
     id_plano_saude_fk: Optional[int] = None
 
+class PacienteAlterarSenha(BaseModel):
+    senha_atual: str
+    senha_nova: str
+
 class PacienteResponse(BaseModel):
     id_paciente: int
     nome: str

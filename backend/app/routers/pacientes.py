@@ -11,12 +11,12 @@ from datetime import datetime, timedelta, date
 from app.database import get_db
 from app.models.models import Paciente, Medico, Consulta, Especialidade, PlanoSaude, HorarioTrabalho
 from app.schemas.schemas import (
-    PacienteCreate, PacienteUpdate, PacienteResponse,
+    PacienteCreate, PacienteUpdate, PacienteAlterarSenha, PacienteResponse,
     ConsultaCreate, ConsultaResponse, ConsultaCancelar, ConsultaReagendar,
     MedicoResponse, EspecialidadeResponse, PlanoSaudeResponse,
     HorariosDisponiveisResponse
 )
-from app.utils.auth import get_password_hash
+from app.utils.auth import get_password_hash, verify_password
 from app.services.regras_negocio import (
     ValidadorAgendamento,
     RegraConsulta,
@@ -86,6 +86,15 @@ def cadastrar_paciente(paciente_data: PacienteCreate, db: Session = Depends(get_
         )
 
 
+@router.get("/planos-saude", response_model=List[PlanoSaudeResponse])
+def listar_planos_saude(db: Session = Depends(get_db)):
+    """
+    Lista todos os planos de saúde disponíveis
+    """
+    planos = db.query(PlanoSaude).all()
+    return planos
+
+
 @router.get("/perfil/{paciente_id}", response_model=PacienteResponse)
 def get_perfil(paciente_id: int, db: Session = Depends(get_db)):
     """
@@ -144,6 +153,45 @@ def atualizar_perfil(
     db.commit()
     db.refresh(paciente)
     return paciente
+
+
+@router.put("/perfil/{paciente_id}/senha")
+def alterar_senha(
+    paciente_id: int,
+    dados_senha: PacienteAlterarSenha,
+    db: Session = Depends(get_db)
+):
+    """
+    Altera a senha do paciente
+    Requer senha atual para validação
+    """
+    paciente = db.query(Paciente).filter(Paciente.id_paciente == paciente_id).first()
+    
+    if not paciente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente não encontrado"
+        )
+    
+    # Verificar senha atual
+    if not verify_password(dados_senha.senha_atual, paciente.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta"
+        )
+    
+    # Validar nova senha (8 a 20 caracteres alfanuméricos)
+    if len(dados_senha.senha_nova) < 8 or len(dados_senha.senha_nova) > 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A senha deve ter entre 8 e 20 caracteres"
+        )
+    
+    # Atualizar senha
+    paciente.senha_hash = get_password_hash(dados_senha.senha_nova)
+    db.commit()
+    
+    return {"message": "Senha alterada com sucesso"}
 
 
 @router.post("/consultas", response_model=ConsultaResponse, status_code=status.HTTP_201_CREATED)
