@@ -75,6 +75,9 @@ async function verificarStatusBloqueio() {
 }
 
 function setupFormListeners() {
+    // Aplicar máscara de telefone
+    aplicarMascaraTelefone();
+    
     // Form de atualização de perfil
     document.getElementById('perfilForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -134,5 +137,41 @@ function showMessage(message, type) {
         alert('ERRO: ' + message);
     } else {
         alert(message);
+    }
+}
+
+// Função para aplicar máscara de telefone
+function aplicarMascaraTelefone() {
+    const telefoneInput = document.getElementById('telefone');
+    
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function(e) {
+            let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+            
+            if (valor.length > 11) {
+                valor = valor.substring(0, 11);
+            }
+            
+            // Aplica a máscara
+            if (valor.length <= 10) {
+                // Formato: (XX) XXXX-XXXX
+                valor = valor.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+            } else {
+                // Formato: (XX) XXXXX-XXXX
+                valor = valor.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+            }
+            
+            e.target.value = valor;
+        });
+        
+        // Validação ao sair do campo
+        telefoneInput.addEventListener('blur', function(e) {
+            const valor = e.target.value.replace(/\D/g, '');
+            
+            if (valor.length > 0 && valor.length < 10) {
+                showMessage('Telefone deve ter no mínimo 10 dígitos (com DDD)', 'error');
+                e.target.focus();
+            }
+        });
     }
 }
