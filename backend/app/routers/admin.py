@@ -69,26 +69,26 @@ def get_dashboard(
     
     # Consultas por período
     consultas_hoje = db.query(Consulta).filter(
-        func.date(Consulta.data_hora) == hoje
+        func.date(Consulta.data_hora_inicio) == hoje
     ).count()
     
     consultas_semana = db.query(Consulta).filter(
-        func.date(Consulta.data_hora) >= inicio_semana,
-        func.date(Consulta.data_hora) <= hoje
+        func.date(Consulta.data_hora_inicio) >= inicio_semana,
+        func.date(Consulta.data_hora_inicio) <= hoje
     ).count()
     
     consultas_mes = db.query(Consulta).filter(
-        func.date(Consulta.data_hora) >= inicio_mes,
-        func.date(Consulta.data_hora) <= hoje
+        func.extract('year', Consulta.data_hora_inicio) == hoje.year,
+        func.extract('month', Consulta.data_hora_inicio) == hoje.month
     ).count()
     
     # Consultas por status
     consultas_agendadas = db.query(Consulta).filter(
-        Consulta.status == "Agendada"
+        Consulta.status == "agendada"
     ).count()
     
     consultas_realizadas = db.query(Consulta).filter(
-        Consulta.status == "Realizada"
+        Consulta.status == "realizada"
     ).count()
     
     return {
@@ -639,9 +639,9 @@ def relatorio_consultas_por_medico(
     )
     
     if data_inicio:
-        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+        query = query.filter(func.date(Consulta.data_hora_inicio) >= data_inicio)
     if data_fim:
-        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+        query = query.filter(func.date(Consulta.data_hora_inicio) <= data_fim)
     
     resultados = query.group_by(
         Medico.id_medico, Medico.nome, Especialidade.nome
@@ -683,9 +683,9 @@ def relatorio_consultas_por_especialidade(
     )
     
     if data_inicio:
-        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+        query = query.filter(func.date(Consulta.data_hora_inicio) >= data_inicio)
     if data_fim:
-        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+        query = query.filter(func.date(Consulta.data_hora_inicio) <= data_fim)
     
     resultados = query.group_by(Especialidade.id_especialidade, Especialidade.nome).all()
     
@@ -715,9 +715,9 @@ def relatorio_cancelamentos(
     query = db.query(Consulta)
     
     if data_inicio:
-        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+        query = query.filter(func.date(Consulta.data_hora_inicio) >= data_inicio)
     if data_fim:
-        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+        query = query.filter(func.date(Consulta.data_hora_inicio) <= data_fim)
     
     total_consultas = query.count()
     total_cancelamentos = query.filter(Consulta.status == "Cancelada").count()
@@ -749,15 +749,15 @@ def relatorio_pacientes_frequentes(
         Paciente.nome.label("paciente_nome"),
         Paciente.cpf,
         func.count(Consulta.id_consulta).label("total_consultas"),
-        func.max(Consulta.data_hora).label("ultima_consulta")
+        func.max(Consulta.data_hora_inicio).label("ultima_consulta")
     ).join(
         Consulta, Consulta.id_paciente_fk == Paciente.id_paciente
     )
     
     if data_inicio:
-        query = query.filter(func.date(Consulta.data_hora) >= data_inicio)
+        query = query.filter(func.date(Consulta.data_hora_inicio) >= data_inicio)
     if data_fim:
-        query = query.filter(func.date(Consulta.data_hora) <= data_fim)
+        query = query.filter(func.date(Consulta.data_hora_inicio) <= data_fim)
     
     resultados = query.group_by(
         Paciente.id_paciente, Paciente.nome, Paciente.cpf
