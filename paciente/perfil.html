@@ -51,20 +51,17 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="email">E-mail *</label>
-                        <input type="email" id="email" name="email" value="joao@email.com" required>
+                        <label for="email">E-mail</label>
+                        <input type="email" id="email" name="email" value="joao@email.com" disabled>
+                        <small style="color: var(--text-light);">E-mail não pode ser alterado</small>
                     </div>
 
                     <div class="form-group">
                         <label for="convenio">Convênio</label>
                         <select id="convenio" name="convenio">
-                            <option value="">Particular (sem convênio)</option>
-                            <option value="unimed" selected>Unimed</option>
-                            <option value="amil">Amil</option>
-                            <option value="bradesco">Bradesco Saúde</option>
-                            <option value="sulamerica">SulAmérica</option>
-                            <option value="outro">Outro</option>
+                            <option value="">Carregando convênios...</option>
                         </select>
+                        <small style="color: var(--text-light);">Lista carregada do banco de dados</small>
                     </div>
 
                     <div class="form-actions">

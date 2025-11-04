@@ -23,6 +23,22 @@ function formatarTelefone(valor) {
     return valor;
 }
 
+// Função para formatar CPF
+function formatarCPF(valor) {
+    // Remove tudo que não é dígito
+    valor = valor.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos
+    if (valor.length > 11) {
+        valor = valor.substring(0, 11);
+    }
+    
+    // Aplica a máscara: XXX.XXX.XXX-XX
+    valor = valor.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2}).*/, '$1.$2.$3-$4');
+    
+    return valor;
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     requireAuth();
     requireUserType('paciente');
@@ -36,12 +52,26 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function carregarDadosPerfil() {
     try {
+        console.log('📊 Carregando perfil do paciente:', pacienteId);
         const perfil = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL(pacienteId));
+        console.log('✅ Perfil carregado do PostgreSQL:', perfil);
+        
+        // Atualizar nome na navbar
+        const nomeNavbar = document.querySelector('.nav-user span strong');
+        if (nomeNavbar) {
+            // Pegar apenas o primeiro nome
+            const primeiroNome = perfil.nome.split(' ')[0];
+            nomeNavbar.textContent = primeiroNome;
+        }
         
         // Preencher campos do formulário
         document.getElementById('nome').value = perfil.nome || '';
-        document.getElementById('cpf').value = perfil.cpf || '';
-        document.getElementById('data-nascimento').value = perfil.data_nascimento || '';
+        
+        // Preencher CPF com máscara
+        const cpfInput = document.getElementById('cpf');
+        if (cpfInput && perfil.cpf) {
+            cpfInput.value = formatarCPF(perfil.cpf);
+        }
         
         // Preencher telefone com máscara
         const telefoneInput = document.getElementById('telefone');
@@ -49,34 +79,67 @@ async function carregarDadosPerfil() {
             telefoneInput.value = formatarTelefone(perfil.telefone);
         }
         
-        document.getElementById('email').value = perfil.email || '';
-        document.getElementById('endereco').value = perfil.endereco || '';
-        
-        // Carregar plano de saúde
-        if (perfil.id_plano_saude_fk) {
-            await carregarPlanoSaude(perfil.id_plano_saude_fk);
+        // Email (campo desabilitado - não pode ser alterado)
+        const emailInput = document.getElementById('email');
+        if (emailInput) {
+            emailInput.value = perfil.email || '';
+            emailInput.disabled = true;
         }
+        
+        // Carregar e selecionar convênio
+        if (perfil.plano_saude) {
+            await carregarConvenios(perfil.id_plano_saude_fk);
+        } else {
+            await carregarConvenios(null);
+        }
+        
     } catch (error) {
-        console.error('Erro ao carregar perfil:', error);
+        console.error('❌ Erro ao carregar perfil:', error);
         showMessage('Erro ao carregar dados do perfil.', 'error');
     }
 }
 
-async function carregarPlanoSaude(planoId) {
+async function carregarConvenios(planoIdSelecionado) {
     try {
+        console.log('🏥 Carregando convênios do PostgreSQL...');
         const planos = await api.get(API_CONFIG.ENDPOINTS.PACIENTE_PLANOS_SAUDE);
-        const selectPlano = document.getElementById('id-plano-saude');
+        const selectConvenio = document.getElementById('convenio');
         
-        selectPlano.innerHTML = '<option value="">Selecione um plano</option>';
+        if (!selectConvenio) {
+            console.error('❌ Select de convênio não encontrado');
+            return;
+        }
+        
+        // Limpar opções existentes e adicionar opção "Particular" (sem ID)
+        selectConvenio.innerHTML = '<option value="">Particular (sem convênio)</option>';
+        
+        // Adicionar planos do banco de dados, exceto "Particular" duplicado
         planos.forEach(plano => {
+            // Ignorar plano "Particular" do banco (evitar duplicação)
+            if (plano.nome.toLowerCase().includes('particular')) {
+                return;
+            }
+            
             const option = document.createElement('option');
-            option.value = plano.id;
-            option.textContent = `${plano.nome} - ${plano.tipo}`;
-            if (plano.id === planoId) option.selected = true;
-            selectPlano.appendChild(option);
+            option.value = plano.id_plano_saude;
+            option.textContent = plano.nome;
+            
+            if (plano.id_plano_saude === planoIdSelecionado) {
+                option.selected = true;
+            }
+            selectConvenio.appendChild(option);
         });
+        
+        // Se nenhum plano foi selecionado (null), selecionar "Particular"
+        if (!planoIdSelecionado) {
+            selectConvenio.value = '';
+        }
+        
+        console.log(`✅ Convênios carregados. Selecionado: ID=${planoIdSelecionado || 'Particular'}`);
+        
     } catch (error) {
-        console.error('Erro ao carregar planos:', error);
+        console.error('❌ Erro ao carregar convênios:', error);
+        showMessage('Erro ao carregar lista de convênios.', 'error');
     }
 }
 
@@ -110,21 +173,41 @@ function setupFormListeners() {
     document.getElementById('perfilForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // Remover máscara do telefone antes de enviar
+        const telefoneFormatado = document.getElementById('telefone').value;
+        const telefoneLimpo = telefoneFormatado.replace(/\D/g, '');
+        
+        // Obter convênio selecionado (vazio = null, senão = ID do plano)
+        const convenioSelect = document.getElementById('convenio');
+        const convenioValue = convenioSelect.value;
+        const planoId = convenioValue ? parseInt(convenioValue) : null;
+        
         const dadosAtualizados = {
             nome: document.getElementById('nome').value,
-            telefone: document.getElementById('telefone').value,
-            email: document.getElementById('email').value,
-            endereco: document.getElementById('endereco').value,
-            id_plano_saude_fk: parseInt(document.getElementById('id-plano-saude').value) || null
+            telefone: telefoneLimpo,
+            id_plano_saude_fk: planoId
         };
         
+        console.log('📤 Enviando atualização para PostgreSQL:', dadosAtualizados);
+        
         try {
-            await api.put(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL_ATUALIZAR(pacienteId), dadosAtualizados);
+            const resultado = await api.put(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL_ATUALIZAR(pacienteId), dadosAtualizados);
+            console.log('✅ Perfil atualizado:', resultado);
             showMessage('Informações atualizadas com sucesso!', 'success');
             await carregarDadosPerfil();
         } catch (error) {
-            console.error('Erro ao atualizar perfil:', error);
-            showMessage('Erro ao atualizar informações. Tente novamente.', 'error');
+            console.error('❌ Erro ao atualizar perfil:', error);
+            let mensagemErro = 'Erro ao atualizar informações. Tente novamente.';
+            
+            if (error.response && error.response.detail) {
+                if (typeof error.response.detail === 'string') {
+                    mensagemErro = error.response.detail;
+                } else if (Array.isArray(error.response.detail)) {
+                    mensagemErro = error.response.detail.map(err => err.msg || err).join(', ');
+                }
+            }
+            
+            showMessage(mensagemErro, 'error');
         }
     });
     
@@ -136,26 +219,52 @@ function setupFormListeners() {
         const novaSenha = document.getElementById('novaSenha').value;
         const confirmarNovaSenha = document.getElementById('confirmarNovaSenha').value;
         
+        // Validações
+        if (!senhaAtual || !novaSenha || !confirmarNovaSenha) {
+            showMessage('Preencha todos os campos de senha!', 'error');
+            return;
+        }
+        
         if (novaSenha.length < 8 || novaSenha.length > 20) {
-            showMessage('A senha deve ter entre 8 e 20 caracteres alfanuméricos!', 'error');
+            showMessage('A senha deve ter entre 8 e 20 caracteres!', 'error');
             return;
         }
         
         if (novaSenha !== confirmarNovaSenha) {
-            showMessage('As senhas não coincidem!', 'error');
+            showMessage('A nova senha e a confirmação não coincidem!', 'error');
             return;
         }
         
+        if (senhaAtual === novaSenha) {
+            showMessage('A nova senha deve ser diferente da senha atual!', 'error');
+            return;
+        }
+        
+        console.log('🔐 Alterando senha...');
+        
         try {
-            await api.put(API_CONFIG.ENDPOINTS.PACIENTE_PERFIL_ATUALIZAR(pacienteId), {
-                senha: novaSenha
+            const resultado = await api.put(API_CONFIG.ENDPOINTS.PACIENTE_ALTERAR_SENHA(pacienteId), {
+                senha_atual: senhaAtual,
+                senha_nova: novaSenha
             });
             
+            console.log('✅ Senha alterada:', resultado);
             showMessage('Senha alterada com sucesso!', 'success');
             document.getElementById('senhaForm').reset();
+            
         } catch (error) {
-            console.error('Erro ao alterar senha:', error);
-            showMessage('Erro ao alterar senha. Verifique se a senha atual está correta.', 'error');
+            console.error('❌ Erro ao alterar senha:', error);
+            let mensagemErro = 'Erro ao alterar senha. Tente novamente.';
+            
+            if (error.response && error.response.detail) {
+                if (typeof error.response.detail === 'string') {
+                    mensagemErro = error.response.detail;
+                } else if (Array.isArray(error.response.detail)) {
+                    mensagemErro = error.response.detail.map(err => err.msg || err).join(', ');
+                }
+            }
+            
+            showMessage(mensagemErro, 'error');
         }
     });
 }
