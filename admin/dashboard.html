@@ -6,6 +6,7 @@
     <title>Painel Administrativo - Clínica Saúde+</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/style.css">
+    <script src="../js/api.js"></script>
     <script src="../js/auth-guard.js"></script>
 </head>
 <body>
@@ -35,19 +36,19 @@
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
                         <div style="padding: 15px; background: var(--light-bg); border-radius: 5px; text-align: center;">
-                            <h4 style="color: var(--secondary-color); margin-bottom: 5px; font-size: 2em;">245</h4>
+                            <h4 style="color: var(--secondary-color); margin-bottom: 5px; font-size: 2em;"><i class="fas fa-spinner fa-spin"></i></h4>
                             <p>Pacientes Cadastrados</p>
                         </div>
                         <div style="padding: 15px; background: var(--light-bg); border-radius: 5px; text-align: center;">
-                            <h4 style="color: var(--tertiary-color); margin-bottom: 5px; font-size: 2em;">15</h4>
+                            <h4 style="color: var(--tertiary-color); margin-bottom: 5px; font-size: 2em;"><i class="fas fa-spinner fa-spin"></i></h4>
                             <p>Médicos Ativos</p>
                         </div>
                         <div style="padding: 15px; background: var(--light-bg); border-radius: 5px; text-align: center;">
-                            <h4 style="color: var(--primary-color); margin-bottom: 5px; font-size: 2em;">128</h4>
+                            <h4 style="color: var(--primary-color); margin-bottom: 5px; font-size: 2em;"><i class="fas fa-spinner fa-spin"></i></h4>
                             <p>Consultas Este Mês</p>
                         </div>
                         <div style="padding: 15px; background: var(--light-bg); border-radius: 5px; text-align: center;">
-                            <h4 style="color: var(--accent-color); margin-bottom: 5px; font-size: 2em;">8</h4>
+                            <h4 style="color: var(--accent-color); margin-bottom: 5px; font-size: 2em;"><i class="fas fa-spinner fa-spin"></i></h4>
                             <p>Cancelamentos</p>
                         </div>
                     </div>
@@ -83,32 +84,9 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>20/10/2025 09:00</td>
-                                <td>Maria Oliveira</td>
-                                <td>Dr. João Silva</td>
-                                <td>Cardiologia</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Realizada</span></td>
-                            </tr>
-                            <tr>
-                                <td>20/10/2025 10:30</td>
-                                <td>Pedro Santos</td>
-                                <td>Dra. Ana Costa</td>
-                                <td>Ortopedia</td>
-                                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Realizada</span></td>
-                            </tr>
-                            <tr>
-                                <td>20/10/2025 14:00</td>
-                                <td>João da Silva</td>
-                                <td>Dr. Carlos Mendes</td>
-                                <td>Dermatologia</td>
-                                <td><span style="color: var(--secondary-color);"><i class="fas fa-clock"></i> Agendada</span></td>
-                            </tr>
-                            <tr>
-                                <td>19/10/2025 15:30</td>
-                                <td>Ana Paula</td>
-                                <td>Dra. Maria Santos</td>
-                                <td>Ginecologia</td>
-                                <td><span style="color: var(--accent-color);"><i class="fas fa-times-circle"></i> Cancelada</span></td>
+                                <td colspan="5" class="text-center">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando consultas...
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -119,11 +97,8 @@
                 <div class="card-header">
                     <h3><i class="fas fa-exclamation-triangle"></i> Alertas e Notificações</h3>
                 </div>
-                <div class="alert alert-warning">
-                    <strong>3 pacientes</strong> estão com risco de bloqueio por faltas consecutivas sem aviso
-                </div>
                 <div class="alert alert-info">
-                    <strong>2 médicos</strong> ainda não configuraram seus horários desta semana
+                    <i class="fas fa-spinner fa-spin"></i> Carregando alertas...
                 </div>
             </div>
         </main>
