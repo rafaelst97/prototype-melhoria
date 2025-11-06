@@ -72,6 +72,7 @@ class Medico(Base):
     - email (UK)
     - senha_hash
     - crm (UK)
+    - telefone
     - id_especialidade_fk (FK)
     """
     __tablename__ = "medico"
@@ -82,6 +83,7 @@ class Medico(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
     crm = Column(String(20), unique=True, nullable=False)
+    telefone = Column(String(20), nullable=True)
     id_especialidade_fk = Column(Integer, ForeignKey("especialidade.id_especialidade"), nullable=False)
     
     # Relacionamentos
