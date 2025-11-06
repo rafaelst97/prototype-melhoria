@@ -201,6 +201,7 @@ def criar_medico(
             email=medico_data.email,
             senha_hash=get_password_hash(medico_data.senha),
             crm=medico_data.crm,
+            telefone=medico_data.telefone,
             id_especialidade_fk=medico_data.id_especialidade_fk
         )
         
@@ -231,6 +232,9 @@ def atualizar_medico(
     """
     verificar_admin(current_user)
     
+    # Debug: Log dos dados recebidos
+    print(f"DEBUG: Dados recebidos para atualização: {medico_data.dict(exclude_unset=True)}")
+    
     medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
     
     if not medico:
@@ -239,10 +243,58 @@ def atualizar_medico(
             detail="Médico não encontrado"
         )
     
-    # Atualizar campos fornecidos
+    # Atualizar nome
     if medico_data.nome is not None:
         medico.nome = medico_data.nome
     
+    # Atualizar CPF (verificar se já existe)
+    if medico_data.cpf is not None:
+        cpf_existe = db.query(Medico).filter(
+            Medico.cpf == medico_data.cpf,
+            Medico.id_medico != medico_id
+        ).first()
+        if cpf_existe:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="CPF já cadastrado para outro médico"
+            )
+        medico.cpf = medico_data.cpf
+    
+    # Atualizar Email (verificar se já existe)
+    if medico_data.email is not None:
+        email_existe = db.query(Medico).filter(
+            Medico.email == medico_data.email,
+            Medico.id_medico != medico_id
+        ).first()
+        if email_existe:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email já cadastrado para outro médico"
+            )
+        medico.email = medico_data.email
+    
+    # Atualizar CRM (verificar se já existe)
+    if medico_data.crm is not None:
+        crm_existe = db.query(Medico).filter(
+            Medico.crm == medico_data.crm,
+            Medico.id_medico != medico_id
+        ).first()
+        if crm_existe:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="CRM já cadastrado para outro médico"
+            )
+        medico.crm = medico_data.crm
+    
+    # Atualizar senha
+    if medico_data.senha is not None:
+        medico.senha_hash = get_password_hash(medico_data.senha)
+    
+    # Atualizar telefone
+    if medico_data.telefone is not None:
+        medico.telefone = medico_data.telefone
+    
+    # Atualizar especialidade
     if medico_data.id_especialidade_fk is not None:
         # Verificar se especialidade existe
         especialidade = db.query(Especialidade).filter(
@@ -255,10 +307,16 @@ def atualizar_medico(
             )
         medico.id_especialidade_fk = medico_data.id_especialidade_fk
     
-    db.commit()
-    db.refresh(medico)
-    
-    return medico
+    try:
+        db.commit()
+        db.refresh(medico)
+        return medico
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Erro ao atualizar médico: dados duplicados"
+        )
 
 
 @router.delete("/medicos/{medico_id}", status_code=status.HTTP_200_OK)
