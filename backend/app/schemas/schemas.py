@@ -123,6 +123,7 @@ class MedicoCreate(BaseModel):
     email: EmailStr
     senha: str
     crm: str
+    telefone: Optional[str] = None
     id_especialidade_fk: int
     
     @validator('senha')
@@ -150,7 +151,28 @@ class MedicoCreate(BaseModel):
 
 class MedicoUpdate(BaseModel):
     nome: Optional[str] = None
+    cpf: Optional[str] = None
+    email: Optional[EmailStr] = None
+    crm: Optional[str] = None
+    telefone: Optional[str] = None
+    senha: Optional[str] = None
     id_especialidade_fk: Optional[int] = None
+    
+    @validator('senha')
+    def validar_senha_alfanumerica(cls, v):
+        """Valida senha alfanumérica de 8-20 caracteres se fornecida"""
+        if v is None:
+            return v
+        if len(v) < 8 or len(v) > 20:
+            raise ValueError('Senha deve ter entre 8 e 20 caracteres')
+        
+        tem_letra = any(c.isalpha() for c in v)
+        tem_numero = any(c.isdigit() for c in v)
+        
+        if not (tem_letra and tem_numero):
+            raise ValueError('Senha deve conter letras e números')
+        
+        return v
 
 class MedicoResponse(BaseModel):
     id_medico: int
@@ -158,6 +180,7 @@ class MedicoResponse(BaseModel):
     cpf: str
     email: str
     crm: str
+    telefone: Optional[str] = None
     id_especialidade_fk: int
     especialidade: Optional[EspecialidadeResponse] = None
     
