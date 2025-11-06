@@ -1,11 +1,34 @@
 // Gerenciar Médicos - Admin - Integrado com API
 let medicos = [];
 let especialidades = [];
+let conveniosMedicos = {}; // Armazena convênios por médico (temporário até backend implementar)
+
+// Carregar convênios do localStorage
+function carregarConveniosLocalStorage() {
+    const stored = localStorage.getItem('convenios_medicos');
+    if (stored) {
+        try {
+            conveniosMedicos = JSON.parse(stored);
+        } catch (e) {
+            conveniosMedicos = {};
+        }
+    }
+}
+
+// Salvar convênios no localStorage
+function salvarConveniosLocalStorage() {
+    localStorage.setItem('convenios_medicos', JSON.stringify(conveniosMedicos));
+}
 
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM carregado - iniciando admin-medicos.js');
     requireAuth();
     requireUserType('administrador');
     
+    console.log('Aguardando 100ms antes de carregar especialidades...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    carregarConveniosLocalStorage(); // Carregar convênios salvos
     await carregarEspecialidades();
     await carregarMedicos();
     configurarFormularioCadastro();
@@ -14,20 +37,37 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Carregar especialidades
 async function carregarEspecialidades() {
     try {
+        console.log('Carregando especialidades do endpoint:', API_CONFIG.ENDPOINTS.ESPECIALIDADES);
         especialidades = await api.get(API_CONFIG.ENDPOINTS.ESPECIALIDADES);
+        console.log('Especialidades carregadas:', especialidades);
+        console.log('Tipo de especialidades:', typeof especialidades, Array.isArray(especialidades));
         
         const select = document.getElementById('especialidade');
-        if (select && especialidades.length > 0) {
+        console.log('Select encontrado:', select);
+        
+        if (select && especialidades && especialidades.length > 0) {
             select.innerHTML = '<option value="">Selecione...</option>';
             especialidades.forEach(esp => {
+                console.log('Adicionando especialidade:', esp);
                 const option = document.createElement('option');
-                option.value = esp.id;
+                option.value = esp.id_especialidade;
                 option.textContent = esp.nome;
                 select.appendChild(option);
             });
+            console.log('Especialidades adicionadas ao select:', especialidades.length);
+        } else {
+            console.warn('Nenhuma especialidade carregada ou select não encontrado');
+            if (select) {
+                select.innerHTML = '<option value="">Nenhuma especialidade encontrada</option>';
+            }
         }
     } catch (error) {
         console.error('Erro ao carregar especialidades:', error);
+        const select = document.getElementById('especialidade');
+        if (select) {
+            select.innerHTML = '<option value="">Erro ao carregar especialidades</option>';
+        }
+        showMessage('Erro ao carregar especialidades: ' + error.message, 'error');
     }
 }
 
@@ -57,34 +97,27 @@ function renderizarMedicos() {
     }
     
     tbody.innerHTML = medicos.map(medico => {
-        const usuario = medico.usuario || {};
         const especialidade = medico.especialidade || {};
-        const ativo = usuario.ativo !== false;
-        
-        const statusHtml = ativo ? 
-            '<span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span>' :
-            '<span style="color: var(--accent-color);"><i class="fas fa-times-circle"></i> Inativo</span>';
+        const convenios = conveniosMedicos[medico.id_medico] || [];
+        const conveniosTexto = convenios.length > 0 ? convenios.join(', ') : 'Não informado';
         
         return `
-            <tr style="${!ativo ? 'opacity: 0.6; background: #f5f5f5;' : ''}">
-                <td>${usuario.nome || 'N/A'}</td>
+            <tr>
+                <td>${medico.nome || 'N/A'}</td>
                 <td>${medico.crm || 'N/A'}</td>
                 <td>${especialidade.nome || 'N/A'}</td>
-                <td>${usuario.email || 'N/A'}</td>
-                <td>${statusHtml}</td>
+                <td>${conveniosTexto}</td>
+                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
                 <td>
-                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhesMedico(${medico.id})">
+                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhesMedico(${medico.id_medico})" title="Ver detalhes">
                         <i class="fas fa-eye"></i> Ver
                     </button>
-                    ${ativo ? `
-                        <button class="btn btn-outline" style="padding: 5px 10px;" onclick="desativarMedico(${medico.id})">
-                            <i class="fas fa-ban"></i> Desativar
-                        </button>
-                    ` : `
-                        <button class="btn btn-tertiary" style="padding: 5px 10px;" onclick="ativarMedico(${medico.id})">
-                            <i class="fas fa-check"></i> Ativar
-                        </button>
-                    `}
+                    <button class="btn btn-primary" style="padding: 5px 10px; margin-right: 5px;" onclick="editarMedico(${medico.id_medico})" title="Editar médico">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-outline" style="padding: 5px 10px;" onclick="desativarMedico(${medico.id_medico})" title="Excluir médico">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
                 </td>
             </tr>
         `;
@@ -98,9 +131,14 @@ function configurarFormularioCadastro() {
     const form = document.getElementById('cadastroMedicoForm');
     
     if (btnNovo && formCadastro) {
-        btnNovo.addEventListener('click', () => {
+        btnNovo.addEventListener('click', async () => {
+            console.log('Botão Novo Médico clicado - abrindo formulário');
             formCadastro.style.display = 'block';
             form.reset();
+            
+            // Recarregar especialidades ao abrir o formulário
+            console.log('Recarregando especialidades...');
+            await carregarEspecialidades();
         });
     }
     
@@ -115,8 +153,23 @@ function configurarFormularioCadastro() {
     const btnCancelar = formCadastro?.querySelector('.btn-outline');
     if (btnCancelar) {
         btnCancelar.addEventListener('click', () => {
-            formCadastro.style.display = 'none';
-            form.reset();
+            resetarFormulario();
+        });
+    }
+    
+    // Adicionar máscara de telefone
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput && typeof maskPhone !== 'undefined') {
+        telefoneInput.addEventListener('input', (e) => {
+            e.target.value = maskPhone(e.target.value);
+        });
+    }
+    
+    // Adicionar máscara de CPF
+    const cpfInput = document.getElementById('cpf');
+    if (cpfInput && typeof maskCPF !== 'undefined') {
+        cpfInput.addEventListener('input', (e) => {
+            e.target.value = maskCPF(e.target.value);
         });
     }
 }
@@ -128,17 +181,34 @@ async function cadastrarMedico() {
     const originalText = btnSubmit.innerHTML;
     
     try {
+        // Coletar convênios selecionados
+        const conveniosSelecionados = Array.from(
+            document.querySelectorAll('input[name="convenios"]:checked')
+        ).map(cb => cb.value);
+        
         const dados = {
-            nome: document.getElementById('nome').value,
-            email: document.getElementById('email').value,
+            nome: document.getElementById('nome').value.trim(),
+            cpf: document.getElementById('cpf').value.replace(/\D/g, ''), // Remove formatação
+            email: document.getElementById('email').value.trim(),
             senha: document.getElementById('senha').value,
-            crm: document.getElementById('crm').value,
-            especialidade_id: parseInt(document.getElementById('especialidade').value)
+            crm: document.getElementById('crm').value.trim(),
+            telefone: document.getElementById('telefone').value.replace(/\D/g, '') || null,
+            id_especialidade_fk: parseInt(document.getElementById('especialidade').value)
         };
         
         // Validações
-        if (!dados.nome || !dados.email || !dados.senha || !dados.crm || !dados.especialidade_id) {
+        if (!dados.nome || !dados.cpf || !dados.email || !dados.senha || !dados.crm || !dados.id_especialidade_fk) {
             showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
+            return;
+        }
+        
+        if (conveniosSelecionados.length === 0) {
+            showMessage('Selecione pelo menos um convênio aceito!', 'error');
+            return;
+        }
+        
+        if (dados.cpf.length !== 11) {
+            showMessage('CPF inválido! Deve ter 11 dígitos.', 'error');
             return;
         }
         
@@ -150,7 +220,11 @@ async function cadastrarMedico() {
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cadastrando...';
         
-        await api.post('/admin/medicos', dados);
+        const medicoNovo = await api.post(API_CONFIG.ENDPOINTS.ADMIN_MEDICO_CRIAR, dados);
+        
+        // Salvar convênios no localStorage
+        conveniosMedicos[medicoNovo.id_medico] = conveniosSelecionados;
+        salvarConveniosLocalStorage();
         
         showMessage('Médico cadastrado com sucesso!', 'success');
         document.getElementById('formCadastro').style.display = 'none';
@@ -173,41 +247,66 @@ async function verDetalhesMedico(medicoId) {
         const medico = await api.get(`/admin/medicos/${medicoId}`);
         hideLoading();
         
-        const usuario = medico.usuario || {};
         const especialidade = medico.especialidade || {};
+        const convenios = conveniosMedicos[medicoId] || [];
+        const conveniosHtml = convenios.length > 0 
+            ? convenios.map(c => `<span style="background: #e0e0e0; padding: 3px 10px; border-radius: 12px; margin-right: 5px; display: inline-block; margin-bottom: 5px;">${c}</span>`).join('')
+            : '<span style="color: #999;">Não informado</span>';
         
         const detalhesHtml = `
-            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                <h3 style="margin-bottom: 20px; color: var(--primary-color);">
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 700px; margin: 0 auto;">
+                <h3 style="margin-bottom: 25px; color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 10px;">
                     <i class="fas fa-user-md"></i> Detalhes do Médico
                 </h3>
                 
-                <div style="margin-bottom: 15px;">
-                    <strong>Nome:</strong> ${usuario.nome || 'N/A'}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Email:</strong> ${usuario.email || 'N/A'}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>CRM:</strong> ${medico.crm || 'N/A'}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Especialidade:</strong> ${especialidade.nome || 'N/A'}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Status:</strong> 
-                    ${usuario.ativo ? 
-                        '<span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span>' : 
-                        '<span style="color: var(--accent-color);"><i class="fas fa-times-circle"></i> Inativo</span>'
-                    }
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Cadastrado em:</strong> ${formatarDataHora(usuario.criado_em)}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">Nome Completo:</strong><br>
+                            <span style="font-size: 1.1em;">${medico.nome || 'N/A'}</span>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">CPF:</strong><br>
+                            ${formatarCPF(medico.cpf)}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">Email:</strong><br>
+                            ${medico.email || 'N/A'}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">CRM:</strong><br>
+                            <span style="font-size: 1.1em; color: var(--primary-color);">${medico.crm || 'N/A'}</span>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">Telefone:</strong><br>
+                            ${formatarTelefone(medico.telefone) || 'Não informado'}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong style="color: #666;">Especialidade:</strong><br>
+                            <span style="background: var(--primary-color); color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.9em;">
+                                ${especialidade.nome || 'N/A'}
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 
-                <button onclick="fecharModal()" class="btn btn-secondary" style="margin-top: 20px;">
-                    <i class="fas fa-times"></i> Fechar
-                </button>
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <strong style="color: #666; display: block; margin-bottom: 10px;">Convênios Aceitos:</strong>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        ${conveniosHtml}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <button onclick="fecharModal()" class="btn btn-secondary" style="flex: 1;">
+                        <i class="fas fa-times"></i> Fechar
+                    </button>
+                    <button onclick="fecharModal(); editarMedico(${medico.id_medico});" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                </div>
             </div>
         `;
         
@@ -218,6 +317,175 @@ async function verDetalhesMedico(medicoId) {
         showMessage('Erro ao carregar detalhes do médico: ' + error.message, 'error');
         hideLoading();
     }
+}
+
+// Editar médico
+async function editarMedico(medicoId) {
+    try {
+        showLoading();
+        const medico = await api.get(`/admin/medicos/${medicoId}`);
+        hideLoading();
+        
+        // Preencher formulário com dados atuais
+        document.getElementById('nome').value = medico.nome || '';
+        document.getElementById('cpf').value = formatarCPF(medico.cpf) || '';
+        document.getElementById('email').value = medico.email || '';
+        document.getElementById('crm').value = medico.crm || '';
+        document.getElementById('telefone').value = formatarTelefone(medico.telefone) || '';
+        document.getElementById('especialidade').value = medico.id_especialidade_fk || '';
+        
+        // Carregar convênios salvos
+        const conveniosSalvos = conveniosMedicos[medicoId] || [];
+        document.querySelectorAll('input[name="convenios"]').forEach(checkbox => {
+            checkbox.checked = conveniosSalvos.includes(checkbox.value);
+        });
+        
+        // Mostrar campo senha mas torná-lo opcional na edição
+        const senhaGroup = document.getElementById('senha').closest('.form-group');
+        if (senhaGroup) {
+            senhaGroup.style.display = 'block';
+            document.getElementById('senha').required = false;
+            document.getElementById('senha').placeholder = 'Deixe em branco para manter a senha atual';
+        }
+        
+        // Alterar título e botão do formulário
+        document.querySelector('#formCadastro .card-header h3').innerHTML = '<i class="fas fa-edit"></i> Editar Médico';
+        const btnSubmit = document.querySelector('#btnSalvar');
+        btnSubmit.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+        btnSubmit.onclick = async (e) => {
+            e.preventDefault();
+            await salvarEdicaoMedico(medicoId);
+        };
+        
+        // Mostrar formulário
+        document.getElementById('formCadastro').style.display = 'block';
+        document.getElementById('formCadastro').scrollIntoView({ behavior: 'smooth' });
+        
+    } catch (error) {
+        console.error('Erro ao carregar médico para edição:', error);
+        showMessage('Erro ao carregar dados do médico: ' + error.message, 'error');
+        hideLoading();
+    }
+}
+
+// Salvar edição do médico
+async function salvarEdicaoMedico(medicoId) {
+    const form = document.getElementById('cadastroMedicoForm');
+    const btnSubmit = document.querySelector('#btnSalvar');
+    const originalText = btnSubmit.innerHTML;
+    
+    try {
+        // Coletar convênios selecionados
+        const conveniosSelecionados = Array.from(
+            document.querySelectorAll('input[name="convenios"]:checked')
+        ).map(cb => cb.value);
+        
+        const dados = {
+            nome: document.getElementById('nome').value.trim(),
+            cpf: document.getElementById('cpf').value.replace(/\D/g, ''),
+            email: document.getElementById('email').value.trim(),
+            crm: document.getElementById('crm').value.trim(),
+            id_especialidade_fk: parseInt(document.getElementById('especialidade').value)
+        };
+        
+        // Adicionar telefone apenas se preenchido
+        const telefone = document.getElementById('telefone').value.replace(/\D/g, '');
+        if (telefone) {
+            dados.telefone = telefone;
+        }
+        
+        // Adicionar senha apenas se foi preenchida
+        const senha = document.getElementById('senha').value;
+        if (senha && senha.trim()) {
+            if (senha.length < 8) {
+                showMessage('A senha deve ter no mínimo 8 caracteres!', 'error');
+                return;
+            }
+            dados.senha = senha;
+        }
+        
+        // Validações
+        if (!dados.nome || !dados.cpf || !dados.email || !dados.crm || !dados.id_especialidade_fk) {
+            showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
+            return;
+        }
+        
+        if (conveniosSelecionados.length === 0) {
+            showMessage('Selecione pelo menos um convênio aceito!', 'error');
+            return;
+        }
+        
+        if (dados.cpf.length !== 11) {
+            showMessage('CPF inválido! Deve ter 11 dígitos.', 'error');
+            return;
+        }
+        
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        
+        console.log('DEBUG: Dados sendo enviados para atualização:', dados);
+        
+        await api.put(API_CONFIG.ENDPOINTS.ADMIN_MEDICO_ATUALIZAR(medicoId), dados);
+        
+        // Atualizar convênios no localStorage
+        conveniosMedicos[medicoId] = conveniosSelecionados;
+        salvarConveniosLocalStorage();
+        
+        showMessage('Médico atualizado com sucesso!', 'success');
+        
+        // Resetar formulário para modo cadastro
+        resetarFormulario();
+        
+        await carregarMedicos();
+        
+    } catch (error) {
+        console.error('Erro ao atualizar médico:', error);
+        showMessage('Erro ao atualizar médico: ' + error.message, 'error');
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalText;
+    }
+}
+
+// Resetar formulário para modo cadastro
+function resetarFormulario() {
+    const form = document.getElementById('cadastroMedicoForm');
+    const formCadastro = document.getElementById('formCadastro');
+    
+    // Esconder formulário
+    formCadastro.style.display = 'none';
+    
+    // Limpar campos
+    form.reset();
+    
+    // Restaurar título
+    document.querySelector('#formCadastro .card-header h3').innerHTML = 'Cadastrar Novo Médico';
+    
+    // Restaurar botão
+    const btnSubmit = document.querySelector('#btnSalvar');
+    btnSubmit.innerHTML = '<i class="fas fa-check"></i> Cadastrar Médico';
+    btnSubmit.onclick = null;
+    btnSubmit.disabled = false;
+    
+    // Mostrar campo senha e torná-lo obrigatório
+    const senhaGroup = document.getElementById('senha').closest('.form-group');
+    if (senhaGroup) {
+        senhaGroup.style.display = 'block';
+        const senhaInput = document.getElementById('senha');
+        senhaInput.required = true;
+        senhaInput.placeholder = 'Senha de acesso';
+    }
+    
+    // Reabilitar campos que foram desabilitados na edição
+    document.getElementById('cpf').disabled = false;
+    document.getElementById('email').disabled = false;
+    document.getElementById('crm').disabled = false;
+    document.getElementById('telefone').disabled = false;
+    
+    // Restaurar estilo dos campos
+    document.getElementById('cpf').style.backgroundColor = '';
+    document.getElementById('email').style.backgroundColor = '';
+    document.getElementById('crm').style.backgroundColor = '';
+    document.getElementById('telefone').style.backgroundColor = '';
 }
 
 // Desativar médico
@@ -336,4 +604,97 @@ function showMessage(message, type) {
     document.body.appendChild(alert);
     
     setTimeout(() => alert.remove(), 5000);
+}
+
+function formatarCPF(cpf) {
+    if (!cpf) return 'N/A';
+    cpf = cpf.replace(/\D/g, '');
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+// Função para formatar telefone
+function formatarTelefone(telefone) {
+    if (!telefone) return '';
+    telefone = telefone.replace(/\D/g, '');
+    if (telefone.length === 11) {
+        return telefone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    } else if (telefone.length === 10) {
+        return telefone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    }
+    return telefone;
+}
+
+// Função para abrir modal de nova especialidade
+function abrirModalNovaEspecialidade() {
+    const html = `
+        <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; margin: 0 auto;">
+            <h3 style="margin-bottom: 20px; color: var(--primary-color);">
+                <i class="fas fa-plus-circle"></i> Nova Especialidade
+            </h3>
+            
+            <form id="formNovaEspecialidade" onsubmit="event.preventDefault(); criarEspecialidade();">
+                <div class="form-group">
+                    <label for="nomeEspecialidade">Nome da Especialidade *</label>
+                    <input type="text" id="nomeEspecialidade" class="form-control" required 
+                           placeholder="Ex: Neurologia" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" onclick="fecharModal()" class="btn btn-outline" style="flex: 1;">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-check"></i> Cadastrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    mostrarModal(html);
+}
+
+// Função para criar especialidade
+async function criarEspecialidade() {
+    const nome = document.getElementById('nomeEspecialidade').value.trim();
+    
+    if (!nome) {
+        showMessage('Por favor, informe o nome da especialidade!', 'error');
+        return;
+    }
+    
+    try {
+        showLoading();
+        
+        const dados = {
+            nome: nome
+        };
+        
+        await api.post(API_CONFIG.ENDPOINTS.ADMIN_ESPECIALIDADES, dados);
+        
+        showMessage('Especialidade cadastrada com sucesso!', 'success');
+        fecharModal();
+        
+        // Recarregar lista de especialidades
+        await carregarEspecialidades();
+        
+        // Selecionar a nova especialidade
+        const select = document.getElementById('especialidade');
+        const novaEspecialidade = especialidades.find(e => e.nome === nome);
+        if (novaEspecialidade && select) {
+            select.value = novaEspecialidade.id_especialidade;
+        }
+        
+        hideLoading();
+    } catch (error) {
+        console.error('Erro ao criar especialidade:', error);
+        
+        if (error.message.includes('409') || error.message.includes('já cadastrada')) {
+            showMessage('Esta especialidade já está cadastrada!', 'error');
+        } else {
+            showMessage('Erro ao cadastrar especialidade: ' + error.message, 'error');
+        }
+        
+        hideLoading();
+    }
 }
