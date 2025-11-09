@@ -380,6 +380,23 @@ class EstatisticasDashboard(BaseModel):
     consultas_agendadas: int
     consultas_realizadas: int
 
+# ============ Bloqueio Horario Schemas ============
+class BloqueioHorarioBase(BaseModel):
+    data: date
+    hora_inicio: time
+    hora_fim: time
+    motivo: Optional[str] = None
+
+class BloqueioHorarioCreate(BloqueioHorarioBase):
+    pass
+
+class BloqueioHorarioResponse(BloqueioHorarioBase):
+    id_bloqueio: int
+    id_medico_fk: int
+    
+    class Config:
+        from_attributes = True
+
 # ============ Schemas Auxiliares ============
 class HorariosDisponiveisResponse(BaseModel):
     data: date

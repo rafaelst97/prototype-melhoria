@@ -11,13 +11,14 @@ from datetime import date, datetime, time
 from app.database import get_db
 from app.models.models import (
     Medico, Consulta, HorarioTrabalho, Observacao,
-    Paciente, Especialidade
+    Paciente, Especialidade, BloqueioHorario
 )
 from app.schemas.schemas import (
     MedicoResponse, MedicoUpdate,
     ConsultaResponse, ConsultaUpdate,
     HorarioTrabalhoCreate, HorarioTrabalhoResponse, HorarioTrabalhoMultiplosCreate,
-    ObservacaoCreate, ObservacaoUpdate, ObservacaoResponse
+    ObservacaoCreate, ObservacaoUpdate, ObservacaoResponse,
+    BloqueioHorarioCreate, BloqueioHorarioResponse
 )
 
 router = APIRouter(prefix="/medicos", tags=["Médicos"])
@@ -460,12 +461,131 @@ def obter_estatisticas(medico_id: int, db: Session = Depends(get_db)):
     ).count()
     
     # Horários bloqueados (considerando horários de trabalho ativos)
-    # Por simplicidade, vamos retornar 0 por enquanto
-    # TODO: Implementar lógica de horários bloqueados quando a funcionalidade for criada
-    horarios_bloqueados = 0
+    # Contando bloqueios ativos (data >= hoje)
+    horarios_bloqueados = db.query(BloqueioHorario).filter(
+        BloqueioHorario.id_medico_fk == medico_id,
+        BloqueioHorario.data >= hoje
+    ).count()
     
     return {
         "consultas_hoje": consultas_hoje,
         "consultas_semana": consultas_semana,
         "horarios_bloqueados": horarios_bloqueados
     }
+
+
+# ============ Endpoints de Bloqueio de Horários ============
+
+@router.post("/bloqueios", response_model=BloqueioHorarioResponse, status_code=status.HTTP_201_CREATED)
+def criar_bloqueio(
+    medico_id: int,
+    bloqueio_data: BloqueioHorarioCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Cria um bloqueio de horário para o médico
+    Usado para bloquear períodos específicos (férias, compromissos, etc)
+    """
+    # Verificar se médico existe
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
+    # Validar que hora_fim > hora_inicio
+    if bloqueio_data.hora_fim <= bloqueio_data.hora_inicio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hora de fim deve ser posterior à hora de início"
+        )
+    
+    # Verificar se já existe bloqueio no mesmo período
+    conflito = db.query(BloqueioHorario).filter(
+        and_(
+            BloqueioHorario.id_medico_fk == medico_id,
+            BloqueioHorario.data == bloqueio_data.data,
+            or_(
+                and_(
+                    BloqueioHorario.hora_inicio <= bloqueio_data.hora_inicio,
+                    BloqueioHorario.hora_fim > bloqueio_data.hora_inicio
+                ),
+                and_(
+                    BloqueioHorario.hora_inicio < bloqueio_data.hora_fim,
+                    BloqueioHorario.hora_fim >= bloqueio_data.hora_fim
+                )
+            )
+        )
+    ).first()
+    
+    if conflito:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Já existe um bloqueio neste período ({conflito.hora_inicio.strftime('%H:%M')} - {conflito.hora_fim.strftime('%H:%M')})"
+        )
+    
+    # Criar bloqueio
+    novo_bloqueio = BloqueioHorario(
+        data=bloqueio_data.data,
+        hora_inicio=bloqueio_data.hora_inicio,
+        hora_fim=bloqueio_data.hora_fim,
+        motivo=bloqueio_data.motivo,
+        id_medico_fk=medico_id
+    )
+    
+    db.add(novo_bloqueio)
+    db.commit()
+    db.refresh(novo_bloqueio)
+    
+    return novo_bloqueio
+
+
+@router.get("/bloqueios", response_model=List[BloqueioHorarioResponse])
+def listar_bloqueios(
+    medico_id: int,
+    data_inicio: date = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Lista bloqueios de horário do médico
+    Opcionalmente filtra por data_inicio (bloqueios >= data_inicio)
+    """
+    query = db.query(BloqueioHorario).filter(
+        BloqueioHorario.id_medico_fk == medico_id
+    )
+    
+    if data_inicio:
+        query = query.filter(BloqueioHorario.data >= data_inicio)
+    
+    bloqueios = query.order_by(BloqueioHorario.data, BloqueioHorario.hora_inicio).all()
+    
+    return bloqueios
+
+
+@router.delete("/bloqueios/{bloqueio_id}", status_code=status.HTTP_200_OK)
+def excluir_bloqueio(
+    bloqueio_id: int,
+    medico_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Exclui um bloqueio de horário
+    """
+    bloqueio = db.query(BloqueioHorario).filter(
+        and_(
+            BloqueioHorario.id_bloqueio == bloqueio_id,
+            BloqueioHorario.id_medico_fk == medico_id
+        )
+    ).first()
+    
+    if not bloqueio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bloqueio não encontrado"
+        )
+    
+    db.delete(bloqueio)
+    db.commit()
+    
+    return {"mensagem": "Bloqueio excluído com sucesso"}

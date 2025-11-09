@@ -19,7 +19,7 @@
                 <li><a href="horarios.html">Horários</a></li>
             </ul>
             <div class="nav-user">
-                <span>Dr(a). <strong>João Silva</strong> - CRM 12345</span>
+                <span><!-- Carregado via JavaScript --></span>
                 <a href="../index.html" class="btn btn-outline" style="padding: 5px 15px;">Sair</a>
             </div>
         </nav>
@@ -62,63 +62,13 @@
                 </div>
             </div>
         </main>
-                <div class="card-header">
-                    <h3>Informações do Paciente</h3>
-                </div>
-
-                <div class="grid-2">
-                    <div>
-                        <p><strong>Nome:</strong> Maria Oliveira</p>
-                        <p><strong>CPF:</strong> 123.456.789-00</p>
-                        <p><strong>Telefone:</strong> (47) 99999-9999</p>
-                    </div>
-                    <div>
-                        <p><strong>E-mail:</strong> maria@email.com</p>
-                        <p><strong>Convênio:</strong> Unimed</p>
-                        <p><strong>Data/Hora:</strong> 20/10/2025 - 09:00</p>
-                    </div>
-                </div>
-
-                <hr style="margin: 20px 0; border: none; border-top: 2px solid var(--light-bg);">
-
-                <div class="card-header">
-                    <h3>Observações do Paciente</h3>
-                </div>
-                <p style="padding: 15px; background: var(--light-bg); border-radius: 5px;">
-                    Sentindo dores no peito e falta de ar ao fazer esforço físico. Histórico familiar de problemas cardíacos.
-                </p>
-
-                <hr style="margin: 20px 0; border: none; border-top: 2px solid var(--light-bg);">
-
-                <div class="card-header">
-                    <h3>Observações Médicas</h3>
-                </div>
-
-                <form id="observacoesForm">
-                    <div class="form-group">
-                        <label for="diagnostico">Diagnóstico / Observações</label>
-                        <textarea id="diagnostico" name="diagnostico" rows="6" placeholder="Registre suas observações sobre a consulta (visível apenas para você e administração)"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="prescricao">Prescrição / Recomendações</label>
-                        <textarea id="prescricao" name="prescricao" rows="6" placeholder="Prescrições médicas e recomendações"></textarea>
-                    </div>
-
-                    <div class="form-actions">
-                        <a href="agenda.html" class="btn btn-outline">Voltar</a>
-                        <button type="submit" class="btn btn-primary">Salvar Observações</button>
-                    </div>
-                </form>
-            </div>
-        </main>
 
         <footer class="footer">
             <p>&copy; 2025 Clínica Saúde+ - Todos os direitos reservados</p>
         </footer>
-    </div>    <script src="../js/api.js"></script>
-
-
+    </div>
+    
+    <script src="../js/api.js"></script>
     <script src="../js/medico-consultas.js"></script>
 </body>
 </html>

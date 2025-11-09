@@ -90,6 +90,7 @@ class Medico(Base):
     especialidade = relationship("Especialidade", back_populates="medicos")
     horarios_trabalho = relationship("HorarioTrabalho", back_populates="medico")
     consultas = relationship("Consulta", back_populates="medico")
+    bloqueios = relationship("BloqueioHorario", back_populates="medico")
 
 class Paciente(Base):
     """
@@ -201,3 +202,25 @@ class Observacao(Base):
     
     # Relacionamentos
     consulta = relationship("Consulta", back_populates="observacao")
+
+class BloqueioHorario(Base):
+    """
+    Entidade: BLOQUEIO_HORARIO
+    - id_bloqueio (PK)
+    - data
+    - hora_inicio
+    - hora_fim
+    - motivo
+    - id_medico_fk (FK)
+    """
+    __tablename__ = "bloqueio_horario"
+    
+    id_bloqueio = Column(Integer, primary_key=True, index=True)
+    data = Column(Date, nullable=False)
+    hora_inicio = Column(Time, nullable=False)
+    hora_fim = Column(Time, nullable=False)
+    motivo = Column(String(200))
+    id_medico_fk = Column(Integer, ForeignKey("medico.id_medico"), nullable=False)
+    
+    # Relacionamentos
+    medico = relationship("Medico", back_populates="bloqueios")

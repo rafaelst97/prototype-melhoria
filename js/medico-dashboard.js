@@ -101,21 +101,45 @@ async function carregarEstatisticas() {
 }
 
 function showMessage(message, type = 'info') {
-    const alertClass = type === 'success' ? 'alert-success' : type === 'error' ? 'alert-danger' : 'alert-warning';
-    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-exclamation-triangle';
+    const colors = {
+        'success': { bg: '#27ae60', icon: 'fa-check-circle' },
+        'error': { bg: '#e74c3c', icon: 'fa-exclamation-circle' },
+        'warning': { bg: '#f39c12', icon: 'fa-exclamation-triangle' },
+        'info': { bg: '#3498db', icon: 'fa-info-circle' }
+    };
+    
+    const config = colors[type] || colors['info'];
     
     const alert = document.createElement('div');
-    alert.className = `alert ${alertClass}`;
     alert.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
+        background: ${config.bg};
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 10001;
         min-width: 300px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        max-width: 500px;
+        font-size: 15px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: slideInRight 0.3s ease-out;
     `;
-    alert.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
+    
+    alert.innerHTML = `
+        <i class="fas ${config.icon}" style="font-size: 20px;"></i>
+        <span style="flex: 1;">${message}</span>
+    `;
+    
     document.body.appendChild(alert);
     
-    setTimeout(() => alert.remove(), 5000);
+    setTimeout(() => {
+        alert.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => alert.remove(), 300);
+    }, 4000);
 }
