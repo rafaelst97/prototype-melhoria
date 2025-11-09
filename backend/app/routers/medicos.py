@@ -420,3 +420,52 @@ def visualizar_observacao(
         )
     
     return observacao
+
+
+@router.get("/estatisticas/{medico_id}")
+def obter_estatisticas(medico_id: int, db: Session = Depends(get_db)):
+    """
+    Retorna estatísticas do médico:
+    - Consultas hoje
+    - Consultas esta semana
+    - Horários bloqueados
+    """
+    from datetime import timedelta
+    
+    # Verificar se médico existe
+    medico = db.query(Medico).filter(Medico.id_medico == medico_id).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Médico não encontrado"
+        )
+    
+    hoje = date.today()
+    inicio_semana = hoje - timedelta(days=hoje.weekday())
+    fim_semana = inicio_semana + timedelta(days=6)
+    
+    # Consultas hoje
+    consultas_hoje = db.query(Consulta).filter(
+        Consulta.id_medico_fk == medico_id,
+        func.date(Consulta.data_hora_inicio) == hoje,
+        Consulta.status.in_(['agendada', 'realizada'])
+    ).count()
+    
+    # Consultas esta semana
+    consultas_semana = db.query(Consulta).filter(
+        Consulta.id_medico_fk == medico_id,
+        func.date(Consulta.data_hora_inicio) >= inicio_semana,
+        func.date(Consulta.data_hora_inicio) <= fim_semana,
+        Consulta.status.in_(['agendada', 'realizada'])
+    ).count()
+    
+    # Horários bloqueados (considerando horários de trabalho ativos)
+    # Por simplicidade, vamos retornar 0 por enquanto
+    # TODO: Implementar lógica de horários bloqueados quando a funcionalidade for criada
+    horarios_bloqueados = 0
+    
+    return {
+        "consultas_hoje": consultas_hoje,
+        "consultas_semana": consultas_semana,
+        "horarios_bloqueados": horarios_bloqueados
+    }
