@@ -25,10 +25,10 @@ function showMessage(message, type = 'info') {
 document.getElementById('loginMedicoForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const crm = document.getElementById('crm').value.trim();
+    const email = document.getElementById('email').value.trim();
     const senha = document.getElementById('senha').value;
     
-    if (!crm || !senha) {
+    if (!email || !senha) {
         showMessage('Por favor, preencha todos os campos!', 'error');
         return;
     }
@@ -42,8 +42,8 @@ document.getElementById('loginMedicoForm')?.addEventListener('submit', async fun
             btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
         }
         
-        // Fazer login com CRM via API (agora salva user_type e user_id automaticamente)
-        const response = await api.loginCRM(crm, senha);
+        // Fazer login com email via API (login unificado)
+        const response = await api.login(email, senha);
         
         // Verificar se é realmente um médico
         if (response.user_type !== 'medico') {
@@ -57,7 +57,7 @@ document.getElementById('loginMedicoForm')?.addEventListener('submit', async fun
         
         // Armazenar nome do usuário
         localStorage.setItem('userName', user.nome || 'Médico');
-        // token, user_type e user_id já foram salvos pelo api.loginCRM()
+        // token, user_type e user_id já foram salvos pelo api.login()
         
         showMessage('Login realizado com sucesso!', 'success');
         
