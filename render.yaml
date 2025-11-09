@@ -30,7 +30,6 @@ services:
   - type: web
     name: clinica-saude-frontend
     runtime: static
-    plan: free
     buildCommand: ""
     staticPublishPath: .
     envVars:
