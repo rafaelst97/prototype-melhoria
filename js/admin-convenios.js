@@ -96,55 +96,25 @@ function renderizarEstatisticas() {
 // Configurar formulário de cadastro
 function configurarFormularioCadastro() {
     const btnNovo = document.querySelector('.btn-primary');
-    const formConvenio = document.getElementById('formConvenio');
-    const form = document.getElementById('cadastroConvenioForm');
     
-    if (btnNovo && formConvenio) {
+    if (btnNovo) {
         btnNovo.addEventListener('click', () => {
             convenioEditando = null;
-            formConvenio.style.display = 'block';
-            form.reset();
-            
-            // Atualizar título e botão
-            const titulo = formConvenio.querySelector('h3');
-            const btnSubmit = form.querySelector('button[type="submit"]');
-            if (titulo) titulo.innerHTML = '<i class="fas fa-plus-circle"></i> Novo Convênio';
-            if (btnSubmit) btnSubmit.innerHTML = '<i class="fas fa-save"></i> Cadastrar';
-        });
-    }
-    
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (convenioEditando) {
-                await atualizarConvenio();
-            } else {
-                await cadastrarConvenio();
-            }
-        });
-    }
-    
-    // Botão cancelar
-    const btnCancelar = formConvenio?.querySelector('.btn-outline');
-    if (btnCancelar) {
-        btnCancelar.addEventListener('click', () => {
-            formConvenio.style.display = 'none';
-            form.reset();
-            convenioEditando = null;
+            abrirModalFormulario('Novo Convênio', 'Cadastrar');
         });
     }
 }
 
 // Cadastrar novo convênio
 async function cadastrarConvenio() {
-    const form = document.getElementById('cadastroConvenioForm');
+    const form = document.getElementById('modalForm');
     const btnSubmit = form.querySelector('button[type="submit"]');
     const originalText = btnSubmit.innerHTML;
     
     try {
         const dados = {
-            nome: document.getElementById('nomeConvenio').value,
-            cobertura_info: document.getElementById('codigoConvenio').value.trim() || null
+            nome: document.getElementById('modalNomeConvenio').value,
+            cobertura_info: document.getElementById('modalCoberturaConvenio').value.trim() || null
         };
         
         // Validações
@@ -159,8 +129,7 @@ async function cadastrarConvenio() {
         await api.post(API_CONFIG.ENDPOINTS.ADMIN_PLANOS_SAUDE, dados);
         
         showMessage('Convênio cadastrado com sucesso!', 'success');
-        document.getElementById('formConvenio').style.display = 'none';
-        form.reset();
+        fecharModal();
         await carregarConvenios();
         
     } catch (error) {
@@ -175,46 +144,34 @@ async function cadastrarConvenio() {
 // Editar convênio
 async function editarConvenio(convenioId) {
     try {
-        showLoading();
         convenioEditando = convenios.find(c => c.id_plano_saude === convenioId);
-        hideLoading();
         
         if (!convenioEditando) {
             showMessage('Convênio não encontrado!', 'error');
             return;
         }
         
-        // Preencher formulário apenas com campos que existem no banco
-        document.getElementById('nomeConvenio').value = convenioEditando.nome || '';
-        document.getElementById('codigoConvenio').value = convenioEditando.cobertura_info || '';
-        
-        // Atualizar título e botão
-        const formConvenio = document.getElementById('formConvenio');
-        const titulo = formConvenio.querySelector('h3');
-        const btnSubmit = formConvenio.querySelector('button[type="submit"]');
-        if (titulo) titulo.innerHTML = '<i class="fas fa-edit"></i> Editar Convênio';
-        if (btnSubmit) btnSubmit.innerHTML = '<i class="fas fa-save"></i> Atualizar';
-        
-        // Exibir formulário
-        formConvenio.style.display = 'block';
+        abrirModalFormulario('Editar Convênio', 'Atualizar', {
+            nome: convenioEditando.nome || '',
+            cobertura: convenioEditando.cobertura_info || ''
+        });
         
     } catch (error) {
         console.error('Erro ao editar convênio:', error);
         showMessage('Erro ao carregar dados do convênio: ' + error.message, 'error');
-        hideLoading();
     }
 }
 
 // Atualizar convênio
 async function atualizarConvenio() {
-    const form = document.getElementById('cadastroConvenioForm');
+    const form = document.getElementById('modalForm');
     const btnSubmit = form.querySelector('button[type="submit"]');
     const originalText = btnSubmit.innerHTML;
     
     try {
         const dados = {
-            nome: document.getElementById('nomeConvenio').value,
-            cobertura_info: document.getElementById('codigoConvenio').value
+            nome: document.getElementById('modalNomeConvenio').value,
+            cobertura_info: document.getElementById('modalCoberturaConvenio').value
         };
         
         // Validações
@@ -229,8 +186,7 @@ async function atualizarConvenio() {
         await api.put(`${API_CONFIG.ENDPOINTS.ADMIN_PLANOS_SAUDE}/${convenioEditando.id_plano_saude}`, dados);
         
         showMessage('Convênio atualizado com sucesso!', 'success');
-        document.getElementById('formConvenio').style.display = 'none';
-        form.reset();
+        fecharModal();
         convenioEditando = null;
         await carregarConvenios();
         
@@ -369,7 +325,7 @@ function verDetalhes(id) {
 function mostrarModal(html) {
     const modal = document.createElement('div');
     modal.id = 'modal-overlay';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center;';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;';
     modal.innerHTML = html;
     
     modal.onclick = (e) => {
@@ -379,8 +335,60 @@ function mostrarModal(html) {
     document.body.appendChild(modal);
 }
 
+// Abrir modal com formulário
+function abrirModalFormulario(titulo, textoBotao, dados = {}) {
+    const modalHtml = `
+        <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto;">
+            <h3 style="margin-bottom: 20px; color: var(--primary-color);">
+                <i class="fas ${convenioEditando ? 'fa-edit' : 'fa-plus-circle'}"></i> ${titulo}
+            </h3>
+            
+            <form id="modalForm">
+                <div class="form-group">
+                    <label for="modalNomeConvenio">Nome do Convênio *</label>
+                    <input type="text" id="modalNomeConvenio" name="modalNomeConvenio" required 
+                           placeholder="Digite o nome do convênio" value="${dados.nome || ''}" 
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div class="form-group" style="margin-top: 15px;">
+                    <label for="modalCoberturaConvenio">Informações de Cobertura</label>
+                    <textarea id="modalCoberturaConvenio" name="modalCoberturaConvenio" rows="4" 
+                              placeholder="Ex: Cobertura nacional, consultas ilimitadas, exames laboratoriais incluídos..."
+                              style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; resize: vertical;">${dados.cobertura || ''}</textarea>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline" onclick="fecharModal()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> ${textoBotao}
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    mostrarModal(modalHtml);
+    
+    // Adicionar evento de submit ao formulário
+    const form = document.getElementById('modalForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (convenioEditando) {
+                await atualizarConvenio();
+            } else {
+                await cadastrarConvenio();
+            }
+        });
+    }
+}
+
 // Fechar modal
 function fecharModal() {
     const modal = document.getElementById('modal-overlay');
     if (modal) modal.remove();
+    convenioEditando = null;
 }
