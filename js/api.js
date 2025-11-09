@@ -1,6 +1,6 @@
 // Configuração da API
 const API_CONFIG = {
-    BASE_URL: 'http://localhost:8000',
+    BASE_URL: window.ENV?.API_URL || 'http://localhost:8000',
     ENDPOINTS: {
         // Auth
         LOGIN: '/auth/login',
