@@ -31,7 +31,6 @@ services:
     name: clinica-saude-frontend
     runtime: static
     plan: free
-    region: oregon
     buildCommand: ""
     staticPublishPath: .
     envVars:
@@ -39,7 +38,7 @@ services:
         fromService:
           name: clinica-saude-backend
           type: web
-          property: hostport
+          property: host
 
 databases:
   - name: clinica-saude-db
