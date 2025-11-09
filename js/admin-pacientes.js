@@ -32,16 +32,18 @@ function renderizarPacientes() {
     if (!tbody) return;
     
     if (pacientesFiltrados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px;">Nenhum paciente encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px;">Nenhum paciente encontrado</td></tr>';
         return;
     }
     
     tbody.innerHTML = pacientesFiltrados.map(paciente => {
-        const usuario = paciente.usuario || {};
-        const convenio = paciente.convenio || {};
+        // Dados do paciente vindos do backend
+        const planoSaude = paciente.plano_saude || null;
+        const bloqueado = paciente.esta_bloqueado || false;
+        
+        // Estatísticas de consultas vindas do backend
         const totalConsultas = paciente.total_consultas || 0;
-        const faltas = paciente.faltas || 0;
-        const bloqueado = paciente.bloqueado || false;
+        const consultasAgendadas = paciente.consultas_agendadas || 0;
         
         // Determinar status
         let statusHtml = '';
@@ -50,9 +52,10 @@ function renderizarPacientes() {
         if (bloqueado) {
             statusHtml = '<span style="color: var(--accent-color);"><i class="fas fa-ban"></i> Bloqueado</span>';
             rowStyle = 'background: #ffcccc;';
-        } else if (faltas >= 2) {
-            statusHtml = `<span style="color: var(--accent-color);"><i class="fas fa-exclamation-triangle"></i> ${faltas} Faltas</span>`;
-            rowStyle = 'background: #ffe6e6;';
+        } else if (consultasAgendadas >= 2) {
+            // RN2: Limite de 2 consultas futuras - destacar quando atingir o limite
+            statusHtml = '<span style="color: var(--accent-color);"><i class="fas fa-exclamation-circle"></i> Limite de Agendamentos</span>';
+            rowStyle = 'background: #fff3cd;';
         } else {
             statusHtml = '<span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span>';
         }
@@ -61,16 +64,16 @@ function renderizarPacientes() {
         let acoesHtml = '';
         if (bloqueado) {
             acoesHtml = `
-                <button class="btn btn-tertiary" style="padding: 5px 10px; margin-right: 5px;" onclick="desbloquearPaciente(${paciente.id})">
+                <button class="btn btn-tertiary" style="padding: 5px 10px; margin-right: 5px;" onclick="desbloquearPaciente(${paciente.id_paciente})">
                     <i class="fas fa-unlock"></i> Desbloquear
                 </button>
-                <button class="btn btn-secondary" style="padding: 5px 10px;" onclick="verDetalhesPaciente(${paciente.id})">
+                <button class="btn btn-secondary" style="padding: 5px 10px;" onclick="verDetalhesPaciente(${paciente.id_paciente})">
                     <i class="fas fa-eye"></i> Detalhes
                 </button>
             `;
         } else {
             acoesHtml = `
-                <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhesPaciente(${paciente.id})">
+                <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhesPaciente(${paciente.id_paciente})">
                     <i class="fas fa-eye"></i> Ver Detalhes
                 </button>
             `;
@@ -78,11 +81,12 @@ function renderizarPacientes() {
         
         return `
             <tr style="${rowStyle}">
-                <td>${usuario.nome || 'N/A'}</td>
+                <td>${paciente.nome || 'N/A'}</td>
                 <td>${formatarCPF(paciente.cpf || '')}</td>
-                <td>${formatarTelefone(usuario.telefone || '')}</td>
-                <td>${convenio.nome || 'Particular'}</td>
-                <td>${totalConsultas}</td>
+                <td>${formatarTelefone(paciente.telefone || '')}</td>
+                <td>${planoSaude ? planoSaude.nome : 'Particular'}</td>
+                <td style="text-align: center;">${totalConsultas}</td>
+                <td style="text-align: center;">${consultasAgendadas}</td>
                 <td>${statusHtml}</td>
                 <td>${acoesHtml}</td>
             </tr>
@@ -92,7 +96,7 @@ function renderizarPacientes() {
 
 // Configurar busca
 function configurarBusca() {
-    const searchInput = document.querySelector('input[type="text"]');
+    const searchInput = document.getElementById('buscaPaciente');
     
     if (!searchInput) return;
     
@@ -103,8 +107,7 @@ function configurarBusca() {
             pacientesFiltrados = [...pacientes];
         } else {
             pacientesFiltrados = pacientes.filter(paciente => {
-                const usuario = paciente.usuario || {};
-                const nome = (usuario.nome || '').toLowerCase();
+                const nome = (paciente.nome || '').toLowerCase();
                 const cpf = (paciente.cpf || '').replace(/\D/g, '');
                 const termoBusca = termo.replace(/\D/g, '');
                 
@@ -123,9 +126,10 @@ async function verDetalhesPaciente(pacienteId) {
         const paciente = await api.get(`/admin/pacientes/${pacienteId}`);
         hideLoading();
         
-        // Montar modal com detalhes
-        const usuario = paciente.usuario || {};
-        const convenio = paciente.convenio || {};
+        // Buscar estatísticas de consultas
+        const pacienteComEstatisticas = pacientes.find(p => p.id_paciente === pacienteId);
+        const totalConsultas = pacienteComEstatisticas?.total_consultas || 0;
+        const consultasAgendadas = pacienteComEstatisticas?.consultas_agendadas || 0;
         
         const detalhesHtml = `
             <div style="background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
@@ -134,10 +138,10 @@ async function verDetalhesPaciente(pacienteId) {
                 </h3>
                 
                 <div style="margin-bottom: 15px;">
-                    <strong>Nome:</strong> ${usuario.nome || 'N/A'}
+                    <strong>Nome:</strong> ${paciente.nome || 'N/A'}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Email:</strong> ${usuario.email || 'N/A'}
+                    <strong>Email:</strong> ${paciente.email || 'N/A'}
                 </div>
                 <div style="margin-bottom: 15px;">
                     <strong>CPF:</strong> ${formatarCPF(paciente.cpf || '')}
@@ -146,34 +150,20 @@ async function verDetalhesPaciente(pacienteId) {
                     <strong>Data de Nascimento:</strong> ${formatarData(paciente.data_nascimento)}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Telefone:</strong> ${formatarTelefone(usuario.telefone || '')}
+                    <strong>Telefone:</strong> ${formatarTelefone(paciente.telefone || '')}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Endereço:</strong> ${usuario.endereco || 'Não informado'}
+                    <strong>Convênio:</strong> ${paciente.plano_saude ? paciente.plano_saude.nome : 'Particular'}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Cidade/Estado:</strong> ${usuario.cidade || 'N/A'} - ${usuario.estado || 'N/A'}
+                    <strong>Total de Consultas:</strong> ${totalConsultas}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>CEP:</strong> ${formatarCEP(usuario.cep || '')}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Convênio:</strong> ${convenio.nome || 'Particular'}
-                </div>
-                ${paciente.numero_carteirinha ? `
-                <div style="margin-bottom: 15px;">
-                    <strong>Carteirinha:</strong> ${paciente.numero_carteirinha}
-                </div>
-                ` : ''}
-                <div style="margin-bottom: 15px;">
-                    <strong>Total de Consultas:</strong> ${paciente.total_consultas || 0}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Faltas:</strong> ${paciente.faltas || 0}
+                    <strong>Faltas:</strong> 0
                 </div>
                 <div style="margin-bottom: 15px;">
                     <strong>Status:</strong> 
-                    ${paciente.bloqueado ? 
+                    ${paciente.esta_bloqueado ? 
                         '<span style="color: var(--accent-color);"><i class="fas fa-ban"></i> Bloqueado</span>' : 
                         '<span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span>'
                     }
@@ -202,7 +192,7 @@ async function desbloquearPaciente(pacienteId) {
     
     try {
         showLoading();
-        await api.put(API_CONFIG.ENDPOINTS.ADMIN_PACIENTE_DESBLOQUEAR(pacienteId));
+        await api.post(API_CONFIG.ENDPOINTS.ADMIN_PACIENTE_DESBLOQUEAR(pacienteId), {});
         showMessage('Paciente desbloqueado com sucesso! Contador de faltas zerado.', 'success');
         await carregarPacientes();
         hideLoading();

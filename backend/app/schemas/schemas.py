@@ -251,6 +251,14 @@ class PacienteResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PacienteAdminResponse(PacienteResponse):
+    """Schema estendido para admin com estatísticas de consultas"""
+    total_consultas: int = 0  # Total de consultas realizadas
+    consultas_agendadas: int = 0  # Consultas futuras (status: agendada)
+    
+    class Config:
+        from_attributes = True
+
 # ============ HorarioTrabalho Schemas ============
 class HorarioTrabalhoBase(BaseModel):
     dia_semana: int = Field(..., ge=0, le=6)
