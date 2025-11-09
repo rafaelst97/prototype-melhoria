@@ -1,11 +1,17 @@
 // Relatórios Admin - Integrado com API (4 novos relatórios)
+let formulariosConfigurados = false;
+
 document.addEventListener('DOMContentLoaded', async function() {
     requireAuth();
     requireUserType('administrador');
     
-    await carregarMedicos();
-    await carregarEspecialidades();
-    configurarFormularios();
+    if (!formulariosConfigurados) {
+        await carregarMedicos();
+        await carregarEspecialidades();
+        await carregarEstatisticasGerais();
+        configurarFormularios();
+        formulariosConfigurados = true;
+    }
 });
 
 // Carregar lista de médicos
@@ -18,7 +24,7 @@ async function carregarMedicos() {
             select.innerHTML = '<option value="">Todos os médicos</option>';
             medicos.forEach(medico => {
                 const option = document.createElement('option');
-                option.value = medico.id;
+                option.value = medico.id_medico;
                 option.textContent = `${medico.nome || 'Médico'} - CRM ${medico.crm}`;
                 select.appendChild(option);
             });
@@ -38,7 +44,7 @@ async function carregarEspecialidades() {
             select.innerHTML = '<option value="">Todas as especialidades</option>';
             especialidades.forEach(esp => {
                 const option = document.createElement('option');
-                option.value = esp.id;
+                option.value = esp.id_especialidade;
                 option.textContent = esp.nome;
                 select.appendChild(option);
             });
@@ -48,64 +54,146 @@ async function carregarEspecialidades() {
     }
 }
 
+// Carregar estatísticas gerais
+async function carregarEstatisticasGerais() {
+    try {
+        const stats = await api.get(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_ESTATISTICAS_GERAIS);
+        const container = document.getElementById('estatisticasGerais');
+        
+        if (container && stats) {
+            const especialidadesHtml = stats.especialidades_top && stats.especialidades_top.length > 0
+                ? stats.especialidades_top.map((esp, idx) => 
+                    `<p>${idx + 1}. ${esp.nome} - ${esp.total} consultas</p>`
+                  ).join('')
+                : '<p>Nenhum dado disponível</p>';
+            
+            container.innerHTML = `
+                <div>
+                    <h4 style="color: var(--primary-color);">Total de Consultas: ${stats.total_consultas}</h4>
+                    <p>Realizadas: ${stats.realizadas} (${stats.perc_realizadas}%)</p>
+                    <p>Agendadas: ${stats.agendadas} (${stats.perc_agendadas}%)</p>
+                    <p>Canceladas: ${stats.canceladas} (${stats.perc_canceladas}%)</p>
+                </div>
+                <div>
+                    <h4 style="color: var(--primary-color);">Especialidades Mais Procuradas:</h4>
+                    ${especialidadesHtml}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+        const container = document.getElementById('estatisticasGerais');
+        if (container) {
+            container.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar estatísticas</p>';
+        }
+    }
+}
+
 // Configurar formulários de relatórios
 function configurarFormularios() {
-    // Relatório 1: Consultas por Período
-    const formConsultasPeriodo = document.getElementById('form-relatorio-consultas');
-    if (formConsultasPeriodo) {
-        formConsultasPeriodo.addEventListener('submit', async (e) => {
+    // Relatório 1: Consultas por Médico
+    const formMedico = document.getElementById('relatorioMedicoForm');
+    if (formMedico) {
+        // Remover listeners anteriores clonando o elemento
+        const novoFormMedico = formMedico.cloneNode(true);
+        formMedico.parentNode.replaceChild(novoFormMedico, formMedico);
+        
+        novoFormMedico.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await gerarRelatorioConsultasPeriodo();
+            const medicoId = document.getElementById('medico').value;
+            const dataInicio = document.getElementById('periodoInicio').value;
+            const dataFim = document.getElementById('periodoFim').value;
+            
+            const params = {};
+            if (medicoId) params.medico_id = medicoId;
+            if (dataInicio) params.data_inicio = dataInicio;
+            if (dataFim) params.data_fim = dataFim;
+            
+            await gerarPDF(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_CONSULTAS_MEDICO, params);
         });
     }
     
-    // Relatório 2: Consultas por Médico
-    const formConsultasMedico = document.getElementById('form-relatorio-medico');
-    if (formConsultasMedico) {
-        formConsultasMedico.addEventListener('submit', async (e) => {
+    // Relatório 2: Consultas por Especialidade
+    const formEspecialidade = document.getElementById('relatorioEspecialidadeForm');
+    if (formEspecialidade) {
+        // Remover listeners anteriores clonando o elemento
+        const novoFormEspecialidade = formEspecialidade.cloneNode(true);
+        formEspecialidade.parentNode.replaceChild(novoFormEspecialidade, formEspecialidade);
+        
+        novoFormEspecialidade.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await gerarRelatorioConsultasMedico();
+            const especialidadeId = document.getElementById('especialidade').value;
+            const dataInicio = document.getElementById('periodoInicio2').value;
+            const dataFim = document.getElementById('periodoFim2').value;
+            
+            const params = {};
+            if (especialidadeId) params.especialidade_id = especialidadeId;
+            if (dataInicio) params.data_inicio = dataInicio;
+            if (dataFim) params.data_fim = dataFim;
+            
+            await gerarPDF(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_CONSULTAS_ESPECIALIDADE, params);
         });
     }
     
-    // Relatório 3: Pacientes com Mais Consultas
-    const formPacientesAtivos = document.getElementById('form-relatorio-pacientes-ativos');
-    if (formPacientesAtivos) {
-        formPacientesAtivos.addEventListener('submit', async (e) => {
+    // Relatório 3: Taxa de Cancelamentos
+    const formCancelamento = document.getElementById('relatorioCancelamentoForm');
+    if (formCancelamento) {
+        // Remover listeners anteriores clonando o elemento
+        const novoFormCancelamento = formCancelamento.cloneNode(true);
+        formCancelamento.parentNode.replaceChild(novoFormCancelamento, formCancelamento);
+        
+        novoFormCancelamento.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await gerarRelatorioPacientesAtivos();
+            const dataInicio = document.getElementById('periodoInicio3').value;
+            const dataFim = document.getElementById('periodoFim3').value;
+            const motivo = document.getElementById('motivoCancelamento').value;
+            
+            const params = {};
+            if (dataInicio) params.data_inicio = dataInicio;
+            if (dataFim) params.data_fim = dataFim;
+            if (motivo) params.motivo = motivo;
+            
+            await gerarPDF(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_CANCELAMENTOS, params);
         });
     }
     
-    // Relatório 4: Taxa de Faltas
-    const formTaxaFaltas = document.getElementById('form-relatorio-faltas');
-    if (formTaxaFaltas) {
-        formTaxaFaltas.addEventListener('submit', async (e) => {
+    // Relatório 4: Pacientes Mais Frequentes
+    const formPaciente = document.getElementById('relatorioPacienteForm');
+    if (formPaciente) {
+        // Remover listeners anteriores clonando o elemento
+        const novoFormPaciente = formPaciente.cloneNode(true);
+        formPaciente.parentNode.replaceChild(novoFormPaciente, formPaciente);
+        
+        novoFormPaciente.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await gerarRelatorioTaxaFaltas();
+            const dataInicio = document.getElementById('periodoInicio4').value;
+            const dataFim = document.getElementById('periodoFim4').value;
+            const limite = document.getElementById('quantidade').value;
+            
+            const params = {};
+            if (dataInicio) params.data_inicio = dataInicio;
+            if (dataFim) params.data_fim = dataFim;
+            if (limite) params.limite = limite;
+            
+            await gerarPDF(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_PACIENTES_FREQUENTES, params);
         });
     }
 }
 
 // Função para gerar PDF e abrir em nova aba
 async function gerarPDF(endpoint, params = {}) {
-    console.log('=== INICIANDO GERAÇÃO DE PDF ===');
+    console.log('=== GERANDO PDF ===');
     console.log('Endpoint:', endpoint);
     console.log('Parâmetros:', params);
     
     try {
-        const btnSubmit = event?.submitter || document.activeElement;
-        const originalText = btnSubmit?.innerHTML || '';
+        showLoading();
         
-        if (btnSubmit) {
-            btnSubmit.disabled = true;
-            btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando PDF...';
-        }
+        // Adicionar formato PDF aos parâmetros
+        params.formato = 'pdf';
         
-        // Construir query string
+        // Construir URL com query params
         const queryParams = new URLSearchParams();
-        queryParams.append('formato', 'pdf');
-        
         for (const [key, value] of Object.entries(params)) {
             if (value) {
                 queryParams.append(key, value);
@@ -113,21 +201,11 @@ async function gerarPDF(endpoint, params = {}) {
         }
         
         const url = `${API_CONFIG.BASE_URL}${endpoint}?${queryParams.toString()}`;
-        
-        console.log('URL completa:', url);
-        console.log('Query params:', queryParams.toString());
-        
-        // Fazer requisição com autenticação
         const token = localStorage.getItem('token');
-        console.log('Token presente:', !!token);
         
-        if (!token) {
-            throw new Error('Usuário não autenticado');
-        }
+        console.log('Fazendo requisição PDF:', url);
         
-        console.log('Fazendo requisição fetch...');
-        
-        // Fazer download do PDF via fetch
+        // Fazer requisição para obter PDF
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -136,37 +214,20 @@ async function gerarPDF(endpoint, params = {}) {
             }
         });
         
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        console.log('Response headers:', [...response.headers.entries()]);
-        
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Erro na resposta (texto):', errorText);
-            const errorData = await response.json().catch(() => ({ detail: errorText }));
-            throw new Error(errorData.detail || 'Erro ao gerar PDF');
+            throw new Error(errorText || 'Erro ao gerar PDF');
         }
         
-        console.log('Criando blob...');
-        // Criar blob e abrir em nova aba
+        // Criar blob do PDF
         const blob = await response.blob();
-        console.log('Blob criado - Size:', blob.size, 'Type:', blob.type);
-        
-        if (blob.size === 0) {
-            throw new Error('PDF vazio retornado pelo servidor');
-        }
-        
-        console.log('Criando URL do blob...');
         const blobUrl = window.URL.createObjectURL(blob);
-        console.log('Blob URL:', blobUrl);
         
-        console.log('Abrindo nova aba...');
+        // Abrir em nova aba
         const newWindow = window.open(blobUrl, '_blank');
-        console.log('Nova janela aberta:', !!newWindow);
         
         if (!newWindow) {
-            console.warn('Popup pode estar bloqueado!');
-            // Tentar fazer download como alternativa
+            // Se popup bloqueado, fazer download
             const a = document.createElement('a');
             a.href = blobUrl;
             a.download = `relatorio_${Date.now()}.pdf`;
@@ -175,135 +236,21 @@ async function gerarPDF(endpoint, params = {}) {
             document.body.removeChild(a);
             showMessage('PDF baixado! (popups bloqueados)', 'warning');
         } else {
-            showMessage('Relatório PDF gerado com sucesso!', 'success');
+            showMessage('PDF gerado com sucesso!', 'success');
         }
         
-        // Limpar URL do blob após 1 minuto
-        setTimeout(() => {
-            console.log('Revogando blob URL');
-            window.URL.revokeObjectURL(blobUrl);
-        }, 60000);
+        // Limpar blob URL após 1 minuto
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
         
-        if (btnSubmit) {
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = originalText;
-        }
-        
-        console.log('✅ PDF gerado com sucesso!');
+        hideLoading();
         
     } catch (error) {
         console.error('❌ ERRO ao gerar PDF:', error);
-        console.error('Stack:', error.stack);
-        showMessage('Erro ao gerar relatório PDF: ' + error.message, 'error');
-        
-        const btnSubmit = event?.submitter || document.activeElement;
-        if (btnSubmit && btnSubmit.tagName === 'BUTTON') {
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = btnSubmit.getAttribute('data-original-text') || '<i class="fas fa-file-pdf"></i> Gerar PDF';
-        }
-    }
-    
-    console.log('=== FIM GERAÇÃO DE PDF ===');
-}
-
-// ==================== 4 RELATÓRIOS PRINCIPAIS ====================
-
-// Relatório 1: Consultas por Período
-async function gerarRelatorioConsultasPeriodo() {
-    const dataInicio = document.getElementById('data-inicio-consultas').value;
-    const dataFim = document.getElementById('data-fim-consultas').value;
-    
-    if (!dataInicio || !dataFim) {
-        showMessage('Por favor, preencha as datas de início e fim', 'error');
-        return;
-    }
-    
-    try {
-        showLoading();
-        const resultado = await api.get(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_CONSULTAS_PERIODO, {
-            params: { data_inicio: dataInicio, data_fim: dataFim }
-        });
-        
-        exibirResultadoRelatorio('Consultas por Período', resultado, 'consultas-periodo');
-        hideLoading();
-    } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
-        showMessage('Erro ao gerar relatório: ' + error.message, 'error');
+        showMessage('Erro ao gerar PDF: ' + error.message, 'error');
         hideLoading();
     }
 }
 
-// Relatório 2: Consultas por Médico
-async function gerarRelatorioConsultasMedico() {
-    const medicoId = document.getElementById('medico-relatorio').value;
-    const dataInicio = document.getElementById('data-inicio-medico').value;
-    const dataFim = document.getElementById('data-fim-medico').value;
-    
-    if (!medicoId) {
-        showMessage('Por favor, selecione um médico', 'error');
-        return;
-    }
-    
-    try {
-        showLoading();
-        const resultado = await api.get(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_CONSULTAS_MEDICO(medicoId), {
-            params: { data_inicio: dataInicio, data_fim: dataFim }
-        });
-        
-        exibirResultadoRelatorio('Consultas por Médico', resultado, 'consultas-medico');
-        hideLoading();
-    } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
-        showMessage('Erro ao gerar relatório: ' + error.message, 'error');
-        hideLoading();
-    }
-}
-
-// Relatório 3: Pacientes com Mais Consultas (Top 10)
-async function gerarRelatorioPacientesAtivos() {
-    const dataInicio = document.getElementById('data-inicio-pacientes').value;
-    const dataFim = document.getElementById('data-fim-pacientes').value;
-    const limite = parseInt(document.getElementById('limite-pacientes').value) || 10;
-    
-    try {
-        showLoading();
-        const resultado = await api.get(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_PACIENTES_ATIVOS, {
-            params: { data_inicio: dataInicio, data_fim: dataFim, limite: limite }
-        });
-        
-        exibirResultadoRelatorio('Pacientes Mais Ativos', resultado, 'pacientes-ativos');
-        hideLoading();
-    } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
-        showMessage('Erro ao gerar relatório: ' + error.message, 'error');
-        hideLoading();
-    }
-}
-
-// Relatório 4: Taxa de Faltas
-async function gerarRelatorioTaxaFaltas() {
-    const dataInicio = document.getElementById('data-inicio-faltas').value;
-    const dataFim = document.getElementById('data-fim-faltas').value;
-    
-    if (!dataInicio || !dataFim) {
-        showMessage('Por favor, preencha as datas de início e fim', 'error');
-        return;
-    }
-    
-    try {
-        showLoading();
-        const resultado = await api.get(API_CONFIG.ENDPOINTS.ADMIN_RELATORIO_TAXA_FALTAS, {
-            params: { data_inicio: dataInicio, data_fim: dataFim }
-        });
-        
-        exibirResultadoRelatorio('Taxa de Faltas', resultado, 'taxa-faltas');
-        hideLoading();
-    } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
-        showMessage('Erro ao gerar relatório: ' + error.message, 'error');
-        hideLoading();
-    }
-}
 
 // Exibir resultado do relatório
 function exibirResultadoRelatorio(titulo, dados, tipo) {

@@ -39,9 +39,6 @@
                             <label for="medico">Médico</label>
                             <select id="medico" name="medico">
                                 <option value="">Todos os médicos</option>
-                                <option value="1">Dr. João Silva</option>
-                                <option value="2">Dra. Maria Santos</option>
-                                <option value="3">Dr. Pedro Oliveira</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -66,9 +63,6 @@
                             <label for="especialidade">Especialidade</label>
                             <select id="especialidade" name="especialidade">
                                 <option value="">Todas as especialidades</option>
-                                <option value="cardiologia">Cardiologia</option>
-                                <option value="ortopedia">Ortopedia</option>
-                                <option value="dermatologia">Dermatologia</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -141,18 +135,10 @@
                 <div class="card-header">
                     <h3><i class="fas fa-chart-line"></i> Visão Geral do Período Atual</h3>
                 </div>
-                <div class="grid-2">
-                    <div>
-                        <h4 style="color: var(--primary-color);">Total de Consultas: 128</h4>
-                        <p>Realizadas: 96 (75%)</p>
-                        <p>Agendadas: 24 (18.75%)</p>
-                        <p>Canceladas: 8 (6.25%)</p>
-                    </div>
-                    <div>
-                        <h4 style="color: var(--primary-color);">Especialidades Mais Procuradas:</h4>
-                        <p>1. Cardiologia - 32 consultas</p>
-                        <p>2. Ortopedia - 28 consultas</p>
-                        <p>3. Clínico Geral - 24 consultas</p>
+                <div id="estatisticasGerais" class="grid-2">
+                    <div style="text-align: center; padding: 20px; color: #999;">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p style="margin-top: 10px;">Carregando estatísticas...</p>
                     </div>
                 </div>
             </div>

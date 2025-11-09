@@ -44,9 +44,11 @@ const API_CONFIG = {
         ADMIN_MEDICO_ATUALIZAR: (id) => `/admin/medicos/${id}`,
         ADMIN_MEDICO_EXCLUIR: (id) => `/admin/medicos/${id}`,
         ADMIN_PACIENTES: '/admin/pacientes',
+        ADMIN_PACIENTES_LISTAR: '/admin/pacientes',
         ADMIN_PACIENTE: (id) => `/admin/pacientes/${id}`,
         ADMIN_PACIENTE_DESBLOQUEAR: (id) => `/admin/pacientes/${id}/desbloquear`,
         ADMIN_PLANOS_SAUDE: '/admin/planos-saude',
+        ADMIN_PLANOS_SAUDE_ESTATISTICAS: '/admin/planos-saude/estatisticas',
         ADMIN_PLANO_SAUDE: (id) => `/admin/planos-saude/${id}`,
         ADMIN_ESPECIALIDADES: '/admin/especialidades',
         ESPECIALIDADES: '/admin/especialidades',
@@ -54,7 +56,8 @@ const API_CONFIG = {
         ADMIN_RELATORIO_CONSULTAS_MEDICO: '/admin/relatorios/consultas-por-medico',
         ADMIN_RELATORIO_CONSULTAS_ESPECIALIDADE: '/admin/relatorios/consultas-por-especialidade',
         ADMIN_RELATORIO_CANCELAMENTOS: '/admin/relatorios/cancelamentos',
-        ADMIN_RELATORIO_PACIENTES_FREQUENTES: '/admin/relatorios/pacientes-frequentes'
+        ADMIN_RELATORIO_PACIENTES_FREQUENTES: '/admin/relatorios/pacientes-frequentes',
+        ADMIN_RELATORIO_ESTATISTICAS_GERAIS: '/admin/relatorios/estatisticas-gerais'
     }
 };
 
