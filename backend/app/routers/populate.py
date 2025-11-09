@@ -6,14 +6,13 @@ Router para popular dados de teste no banco
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, time
+from datetime import datetime, time, date
 import bcrypt
-import secrets
 
 from app.database import get_db
 from app.models.models import (
-    Usuario, Paciente, Medico, Convenio, Especialidade,
-    HorarioAtendimento, Consulta
+    Administrador, Paciente, Medico, PlanoSaude, Especialidade,
+    HorarioTrabalho, Consulta
 )
 
 router = APIRouter()
@@ -21,6 +20,7 @@ router = APIRouter()
 # 🔐 TOKEN SECRETO - Mude este valor para algo único!
 # Gere um novo com: python -c "import secrets; print(secrets.token_urlsafe(32))"
 SECRET_TOKEN = "meu-token-super-secreto-2025"
+
 
 @router.post("/popular-dados")
 def popular_dados_teste(db: Session = Depends(get_db)):
@@ -32,34 +32,34 @@ def popular_dados_teste(db: Session = Depends(get_db)):
     
     try:
         # Verificar se já existem dados
-        if db.query(Usuario).count() > 0:
+        if db.query(Administrador).count() > 0:
             return {
                 "message": "Banco de dados já contém dados",
-                "warning": "Use /limpar-dados primeiro se quiser repopular"
+                "warning": "Use DELETE /limpar-dados primeiro se quiser repopular"
             }
         
-        # 1. Criar Convênios
-        convenios_data = [
-            {"nome": "Unimed", "ativo": True},
-            {"nome": "Amil", "ativo": True},
-            {"nome": "Bradesco Saúde", "ativo": True}
+        # 1. Criar Planos de Saúde
+        planos_data = [
+            {"nome": "Unimed", "cobertura_info": "Cobertura nacional com rede ampla"},
+            {"nome": "Amil", "cobertura_info": "Cobertura nacional premium"},
+            {"nome": "Bradesco Saúde", "cobertura_info": "Cobertura regional"}
         ]
         
-        convenios = []
-        for conv_data in convenios_data:
-            conv = Convenio(**conv_data)
-            db.add(conv)
-            convenios.append(conv)
+        planos = []
+        for plano_data in planos_data:
+            plano = PlanoSaude(**plano_data)
+            db.add(plano)
+            planos.append(plano)
         
         db.flush()
         
         # 2. Criar Especialidades
         especialidades_data = [
-            {"nome": "Cardiologia", "ativo": True},
-            {"nome": "Dermatologia", "ativo": True},
-            {"nome": "Pediatria", "ativo": True},
-            {"nome": "Ortopedia", "ativo": True},
-            {"nome": "Ginecologia", "ativo": True}
+            {"nome": "Cardiologia"},
+            {"nome": "Dermatologia"},
+            {"nome": "Pediatria"},
+            {"nome": "Ortopedia"},
+            {"nome": "Ginecologia"}
         ]
         
         especialidades = []
@@ -70,38 +70,42 @@ def popular_dados_teste(db: Session = Depends(get_db)):
         
         db.flush()
         
-        # 3. Criar Usuário Admin
+        # 3. Criar Administrador
         senha_hash_admin = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt())
-        admin = Usuario(
+        admin = Administrador(
+            nome="Administrador do Sistema",
             email="admin@clinica.com",
             senha_hash=senha_hash_admin.decode('utf-8'),
-            tipo_usuario="admin",
-            ativo=True
+            papel="Super Admin"
         )
         db.add(admin)
+        db.flush()
         
         # 4. Criar Médicos
         medicos_data = [
             {
                 "nome": "Dr. João Silva",
+                "cpf": "123.456.789-00",
                 "crm": "12345-SP",
-                "email": "joao1@clinica.com",
+                "email": "joao.silva@clinica.com",
                 "telefone": "(11) 98765-4321",
-                "especialidade_id": 1  # Cardiologia
+                "id_especialidade_fk": especialidades[0].id_especialidade  # Cardiologia
             },
             {
                 "nome": "Dra. Maria Santos",
+                "cpf": "987.654.321-00",
                 "crm": "67890-SP",
-                "email": "maria@clinica.com",
+                "email": "maria.santos@clinica.com",
                 "telefone": "(11) 98765-4322",
-                "especialidade_id": 2  # Dermatologia
+                "id_especialidade_fk": especialidades[1].id_especialidade  # Dermatologia
             },
             {
                 "nome": "Dr. Pedro Costa",
+                "cpf": "111.222.333-44",
                 "crm": "11111-SP",
-                "email": "pedro@clinica.com",
+                "email": "pedro.costa@clinica.com",
                 "telefone": "(11) 98765-4323",
-                "especialidade_id": 3  # Pediatria
+                "id_especialidade_fk": especialidades[2].id_especialidade  # Pediatria
             }
         ]
         
@@ -109,85 +113,76 @@ def popular_dados_teste(db: Session = Depends(get_db)):
         
         medicos = []
         for med_data in medicos_data:
-            # Criar usuário do médico
-            usuario = Usuario(
-                email=med_data["email"],
-                senha_hash=senha_hash_medico.decode('utf-8'),
-                tipo_usuario="medico",
-                ativo=True
-            )
-            db.add(usuario)
-            db.flush()
-            
-            # Criar médico
             medico = Medico(
                 nome=med_data["nome"],
+                cpf=med_data["cpf"],
                 crm=med_data["crm"],
+                email=med_data["email"],
+                senha_hash=senha_hash_medico.decode('utf-8'),
                 telefone=med_data["telefone"],
-                id_especialidade_fk=med_data["especialidade_id"],
-                id_usuario_fk=usuario.id_usuario,
-                ativo=True
+                id_especialidade_fk=med_data["id_especialidade_fk"]
             )
             db.add(medico)
             medicos.append(medico)
         
         db.flush()
         
-        # 5. Criar horários de atendimento para médicos
+        # 5. Criar horários de trabalho para médicos
         for medico in medicos:
-            for dia_semana in range(1, 6):  # Segunda a Sexta
-                horario = HorarioAtendimento(
+            # Segunda a Sexta (0 a 4)
+            for dia_semana in range(0, 5):
+                # Manhã: 8h-12h
+                horario_manha = HorarioTrabalho(
                     id_medico_fk=medico.id_medico,
                     dia_semana=dia_semana,
                     hora_inicio=time(8, 0),
-                    hora_fim=time(12, 0),
-                    ativo=True
+                    hora_fim=time(12, 0)
                 )
-                db.add(horario)
+                db.add(horario_manha)
                 
-                horario2 = HorarioAtendimento(
+                # Tarde: 14h-18h
+                horario_tarde = HorarioTrabalho(
                     id_medico_fk=medico.id_medico,
                     dia_semana=dia_semana,
                     hora_inicio=time(14, 0),
-                    hora_fim=time(18, 0),
-                    ativo=True
+                    hora_fim=time(18, 0)
                 )
-                db.add(horario2)
+                db.add(horario_tarde)
         
         # 6. Criar Pacientes
         pacientes_data = [
             {
                 "nome": "Maria Oliveira",
-                "cpf": "123.456.789-00",
-                "email": "maria@email.com",
+                "cpf": "555.666.777-88",
+                "email": "maria.oliveira@email.com",
                 "telefone": "(11) 91234-5678",
                 "data_nascimento": "1990-05-15"
             },
             {
                 "nome": "José Santos",
-                "cpf": "987.654.321-00",
-                "email": "jose@email.com",
+                "cpf": "999.888.777-66",
+                "email": "jose.santos@email.com",
                 "telefone": "(11) 91234-5679",
                 "data_nascimento": "1985-08-20"
             },
             {
                 "nome": "Ana Costa",
-                "cpf": "111.222.333-44",
-                "email": "ana@email.com",
+                "cpf": "444.555.666-77",
+                "email": "ana.costa@email.com",
                 "telefone": "(11) 91234-5680",
                 "data_nascimento": "1995-03-10"
             },
             {
                 "nome": "Carlos Silva",
-                "cpf": "555.666.777-88",
-                "email": "carlos@email.com",
+                "cpf": "222.333.444-55",
+                "email": "carlos.silva@email.com",
                 "telefone": "(11) 91234-5681",
                 "data_nascimento": "1988-12-25"
             },
             {
                 "nome": "Paula Lima",
-                "cpf": "999.888.777-66",
-                "email": "paula@email.com",
+                "cpf": "333.444.555-66",
+                "email": "paula.lima@email.com",
                 "telefone": "(11) 91234-5682",
                 "data_nascimento": "1992-07-30"
             }
@@ -196,51 +191,41 @@ def popular_dados_teste(db: Session = Depends(get_db)):
         senha_hash_paciente = bcrypt.hashpw("paciente123".encode('utf-8'), bcrypt.gensalt())
         
         for pac_data in pacientes_data:
-            # Criar usuário do paciente
-            usuario = Usuario(
-                email=pac_data["email"],
-                senha_hash=senha_hash_paciente.decode('utf-8'),
-                tipo_usuario="paciente",
-                ativo=True
-            )
-            db.add(usuario)
-            db.flush()
-            
-            # Criar paciente
             paciente = Paciente(
                 nome=pac_data["nome"],
                 cpf=pac_data["cpf"],
+                email=pac_data["email"],
+                senha_hash=senha_hash_paciente.decode('utf-8'),
                 telefone=pac_data["telefone"],
                 data_nascimento=datetime.strptime(pac_data["data_nascimento"], "%Y-%m-%d").date(),
-                id_usuario_fk=usuario.id_usuario,
-                id_convenio_fk=convenios[0].id_convenio,  # Unimed
-                ativo=True
+                esta_bloqueado=False,
+                id_plano_saude_fk=planos[0].id_plano_saude  # Unimed
             )
             db.add(paciente)
         
         db.commit()
         
         # Contar registros criados
-        total_usuarios = db.query(Usuario).count()
+        total_admins = db.query(Administrador).count()
         total_medicos = db.query(Medico).count()
         total_pacientes = db.query(Paciente).count()
-        total_convenios = db.query(Convenio).count()
+        total_planos = db.query(PlanoSaude).count()
         total_especialidades = db.query(Especialidade).count()
         
         return {
             "success": True,
             "message": "✅ Banco de dados populado com sucesso!",
             "dados_criados": {
-                "usuarios": total_usuarios,
+                "administradores": total_admins,
                 "medicos": total_medicos,
                 "pacientes": total_pacientes,
-                "convenios": total_convenios,
+                "planos_saude": total_planos,
                 "especialidades": total_especialidades
             },
             "credenciais_teste": {
                 "admin": {"email": "admin@clinica.com", "senha": "admin123"},
-                "medico": {"email": "joao1@clinica.com", "senha": "medico123"},
-                "paciente": {"email": "maria@email.com", "senha": "paciente123"}
+                "medico": {"email": "joao.silva@clinica.com", "senha": "medico123"},
+                "paciente": {"email": "maria.oliveira@email.com", "senha": "paciente123"}
             }
         }
         
@@ -259,12 +244,12 @@ def limpar_dados(db: Session = Depends(get_db)):
     try:
         # Deletar em ordem para respeitar foreign keys
         db.query(Consulta).delete()
-        db.query(HorarioAtendimento).delete()
+        db.query(HorarioTrabalho).delete()
         db.query(Paciente).delete()
         db.query(Medico).delete()
-        db.query(Usuario).delete()
+        db.query(Administrador).delete()
         db.query(Especialidade).delete()
-        db.query(Convenio).delete()
+        db.query(PlanoSaude).delete()
         
         db.commit()
         
@@ -337,9 +322,9 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
     # Popular banco de dados
     try:
         # Verificar se já existem dados
-        total_usuarios = db.query(Usuario).count()
+        total_admins = db.query(Administrador).count()
         
-        if total_usuarios > 0:
+        if total_admins > 0:
             return HTMLResponse(
                 content=f"""
                 <!DOCTYPE html>
@@ -382,7 +367,7 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
                         <div class="icon">⚠️</div>
                         <h1>Banco de Dados Já Contém Dados</h1>
                         <div class="info">
-                            <strong>Total de usuários encontrados:</strong> {total_usuarios}
+                            <strong>Total de administradores encontrados:</strong> {total_admins}
                         </div>
                         <p>O banco de dados já foi populado anteriormente.</p>
                         <p>Se quiser repopular, primeiro limpe os dados usando o endpoint DELETE /admin/limpar-dados</p>
@@ -392,29 +377,29 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
                 """
             )
         
-        # Executar população (mesmo código do endpoint POST)
-        # 1. Criar Convênios
-        convenios_data = [
-            {"nome": "Unimed", "ativo": True},
-            {"nome": "Amil", "ativo": True},
-            {"nome": "Bradesco Saúde", "ativo": True}
+        # Executar população
+        # 1. Criar Planos de Saúde
+        planos_data = [
+            {"nome": "Unimed", "cobertura_info": "Cobertura nacional com rede ampla"},
+            {"nome": "Amil", "cobertura_info": "Cobertura nacional premium"},
+            {"nome": "Bradesco Saúde", "cobertura_info": "Cobertura regional"}
         ]
         
-        convenios = []
-        for conv_data in convenios_data:
-            conv = Convenio(**conv_data)
-            db.add(conv)
-            convenios.append(conv)
+        planos = []
+        for plano_data in planos_data:
+            plano = PlanoSaude(**plano_data)
+            db.add(plano)
+            planos.append(plano)
         
         db.flush()
         
         # 2. Criar Especialidades
         especialidades_data = [
-            {"nome": "Cardiologia", "ativo": True},
-            {"nome": "Dermatologia", "ativo": True},
-            {"nome": "Pediatria", "ativo": True},
-            {"nome": "Ortopedia", "ativo": True},
-            {"nome": "Ginecologia", "ativo": True}
+            {"nome": "Cardiologia"},
+            {"nome": "Dermatologia"},
+            {"nome": "Pediatria"},
+            {"nome": "Ortopedia"},
+            {"nome": "Ginecologia"}
         ]
         
         especialidades = []
@@ -425,38 +410,42 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
         
         db.flush()
         
-        # 3. Criar Usuário Admin
+        # 3. Criar Administrador
         senha_hash_admin = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt())
-        admin = Usuario(
+        admin = Administrador(
+            nome="Administrador do Sistema",
             email="admin@clinica.com",
             senha_hash=senha_hash_admin.decode('utf-8'),
-            tipo_usuario="admin",
-            ativo=True
+            papel="Super Admin"
         )
         db.add(admin)
+        db.flush()
         
         # 4. Criar Médicos
         medicos_data = [
             {
                 "nome": "Dr. João Silva",
+                "cpf": "123.456.789-00",
                 "crm": "12345-SP",
-                "email": "joao1@clinica.com",
+                "email": "joao.silva@clinica.com",
                 "telefone": "(11) 98765-4321",
-                "especialidade_id": 1
+                "id_especialidade_fk": especialidades[0].id_especialidade
             },
             {
                 "nome": "Dra. Maria Santos",
+                "cpf": "987.654.321-00",
                 "crm": "67890-SP",
-                "email": "maria@clinica.com",
+                "email": "maria.santos@clinica.com",
                 "telefone": "(11) 98765-4322",
-                "especialidade_id": 2
+                "id_especialidade_fk": especialidades[1].id_especialidade
             },
             {
                 "nome": "Dr. Pedro Costa",
+                "cpf": "111.222.333-44",
                 "crm": "11111-SP",
-                "email": "pedro@clinica.com",
+                "email": "pedro.costa@clinica.com",
                 "telefone": "(11) 98765-4323",
-                "especialidade_id": 3
+                "id_especialidade_fk": especialidades[2].id_especialidade
             }
         ]
         
@@ -464,83 +453,73 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
         
         medicos = []
         for med_data in medicos_data:
-            usuario = Usuario(
-                email=med_data["email"],
-                senha_hash=senha_hash_medico.decode('utf-8'),
-                tipo_usuario="medico",
-                ativo=True
-            )
-            db.add(usuario)
-            db.flush()
-            
             medico = Medico(
                 nome=med_data["nome"],
+                cpf=med_data["cpf"],
                 crm=med_data["crm"],
+                email=med_data["email"],
+                senha_hash=senha_hash_medico.decode('utf-8'),
                 telefone=med_data["telefone"],
-                id_especialidade_fk=med_data["especialidade_id"],
-                id_usuario_fk=usuario.id_usuario,
-                ativo=True
+                id_especialidade_fk=med_data["id_especialidade_fk"]
             )
             db.add(medico)
             medicos.append(medico)
         
         db.flush()
         
-        # 5. Criar horários de atendimento
+        # 5. Criar horários de trabalho
         for medico in medicos:
-            for dia_semana in range(1, 6):
-                horario = HorarioAtendimento(
+            for dia_semana in range(0, 5):  # Segunda a Sexta
+                horario_manha = HorarioTrabalho(
                     id_medico_fk=medico.id_medico,
                     dia_semana=dia_semana,
                     hora_inicio=time(8, 0),
-                    hora_fim=time(12, 0),
-                    ativo=True
+                    hora_fim=time(12, 0)
                 )
-                db.add(horario)
+                db.add(horario_manha)
                 
-                horario2 = HorarioAtendimento(
+                horario_tarde = HorarioTrabalho(
                     id_medico_fk=medico.id_medico,
                     dia_semana=dia_semana,
                     hora_inicio=time(14, 0),
-                    hora_fim=time(18, 0),
-                    ativo=True
+                    hora_fim=time(18, 0)
                 )
-                db.add(horario2)
+                db.add(horario_tarde)
         
         # 6. Criar Pacientes
         pacientes_data = [
             {
                 "nome": "Maria Oliveira",
-                "cpf": "123.456.789-00",
-                "email": "maria@email.com",
+                "cpf": "555.666.777-88",
+                "email": "maria.oliveira@email.com",
                 "telefone": "(11) 91234-5678",
                 "data_nascimento": "1990-05-15"
             },
             {
                 "nome": "José Santos",
-                "cpf": "987.654.321-00",
-                "email": "jose@email.com",
+                "cpf": "999.888.777-66",
+                "email": "jose.santos@email.com",
                 "telefone": "(11) 91234-5679",
                 "data_nascimento": "1985-08-20"
             },
             {
                 "nome": "Ana Costa",
-                "cpf": "111.222.333-44",
-                "email": "ana@email.com",
+                "cpf": "444.555.666-77",
+                "email": "ana.costa@email.com",
                 "telefone": "(11) 91234-5680",
                 "data_nascimento": "1995-03-10"
             },
             {
                 "nome": "Carlos Silva",
-                "cpf": "555.666.777-88",
-                "email": "carlos@email.com",
+                "cpf": "222.333.444-55",
+                "email": "carlos.silva@email.com",
                 "telefone": "(11) 91234-5681",
                 "data_nascimento": "1988-12-25"
             },
             {
                 "nome": "Paula Lima",
-                "cpf": "999.888.777-66",
-                "email": "paula@email.com",
+                "cpf": "333.444.555-66",
+                "email": "paula.lima@email.com",
                 "telefone": "(11) 91234-5682",
                 "data_nascimento": "1992-07-30"
             }
@@ -549,33 +528,25 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
         senha_hash_paciente = bcrypt.hashpw("paciente123".encode('utf-8'), bcrypt.gensalt())
         
         for pac_data in pacientes_data:
-            usuario = Usuario(
-                email=pac_data["email"],
-                senha_hash=senha_hash_paciente.decode('utf-8'),
-                tipo_usuario="paciente",
-                ativo=True
-            )
-            db.add(usuario)
-            db.flush()
-            
             paciente = Paciente(
                 nome=pac_data["nome"],
                 cpf=pac_data["cpf"],
+                email=pac_data["email"],
+                senha_hash=senha_hash_paciente.decode('utf-8'),
                 telefone=pac_data["telefone"],
                 data_nascimento=datetime.strptime(pac_data["data_nascimento"], "%Y-%m-%d").date(),
-                id_usuario_fk=usuario.id_usuario,
-                id_convenio_fk=convenios[0].id_convenio,
-                ativo=True
+                esta_bloqueado=False,
+                id_plano_saude_fk=planos[0].id_plano_saude
             )
             db.add(paciente)
         
         db.commit()
         
         # Contar registros
-        total_usuarios = db.query(Usuario).count()
+        total_admins = db.query(Administrador).count()
         total_medicos = db.query(Medico).count()
         total_pacientes = db.query(Paciente).count()
-        total_convenios = db.query(Convenio).count()
+        total_planos = db.query(PlanoSaude).count()
         total_especialidades = db.query(Especialidade).count()
         
         # Retornar HTML de sucesso
@@ -664,8 +635,8 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
                     
                     <div class="stats">
                         <div class="stat">
-                            <div class="stat-number">{total_usuarios}</div>
-                            <div class="stat-label">Usuários</div>
+                            <div class="stat-number">{total_admins}</div>
+                            <div class="stat-label">Administradores</div>
                         </div>
                         <div class="stat">
                             <div class="stat-number">{total_medicos}</div>
@@ -676,8 +647,8 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
                             <div class="stat-label">Pacientes</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-number">{total_convenios}</div>
-                            <div class="stat-label">Convênios</div>
+                            <div class="stat-number">{total_planos}</div>
+                            <div class="stat-label">Planos de Saúde</div>
                         </div>
                         <div class="stat">
                             <div class="stat-number">{total_especialidades}</div>
@@ -696,13 +667,13 @@ def popular_banco_secreto(token: str, db: Session = Depends(get_db)):
                         
                         <div class="cred-item">
                             <div class="cred-title">👨‍⚕️ MÉDICO</div>
-                            <div class="cred-info">Email: joao1@clinica.com</div>
+                            <div class="cred-info">Email: joao.silva@clinica.com</div>
                             <div class="cred-info">Senha: medico123</div>
                         </div>
                         
                         <div class="cred-item">
                             <div class="cred-title">🏥 PACIENTE</div>
-                            <div class="cred-info">Email: maria@email.com</div>
+                            <div class="cred-info">Email: maria.oliveira@email.com</div>
                             <div class="cred-info">Senha: paciente123</div>
                         </div>
                     </div>
