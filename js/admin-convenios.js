@@ -142,28 +142,21 @@ async function cadastrarConvenio() {
     const originalText = btnSubmit.innerHTML;
     
     try {
-        const telefoneInput = document.getElementById('telefoneConvenio');
-        const emailInput = document.getElementById('emailConvenio');
-        const descricaoInput = document.getElementById('descricaoConvenio');
-        
         const dados = {
             nome: document.getElementById('nomeConvenio').value,
-            codigo: document.getElementById('codigoConvenio').value,
-            telefone: telefoneInput?.value.trim() || null,
-            email: emailInput?.value.trim() || null,
-            descricao: descricaoInput?.value.trim() || null
+            cobertura_info: document.getElementById('codigoConvenio').value.trim() || null
         };
         
         // Validações
-        if (!dados.nome || !dados.codigo) {
-            showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
+        if (!dados.nome) {
+            showMessage('Por favor, preencha o nome do convênio!', 'error');
             return;
         }
         
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cadastrando...';
         
-        await api.post('/admin/convenios', dados);
+        await api.post(API_CONFIG.ENDPOINTS.ADMIN_PLANOS_SAUDE, dados);
         
         showMessage('Convênio cadastrado com sucesso!', 'success');
         document.getElementById('formConvenio').style.display = 'none';
@@ -183,7 +176,7 @@ async function cadastrarConvenio() {
 async function editarConvenio(convenioId) {
     try {
         showLoading();
-        convenioEditando = convenios.find(c => c.id === convenioId);
+        convenioEditando = convenios.find(c => c.id_plano_saude === convenioId);
         hideLoading();
         
         if (!convenioEditando) {
@@ -191,16 +184,9 @@ async function editarConvenio(convenioId) {
             return;
         }
         
-        // Preencher formulário
+        // Preencher formulário apenas com campos que existem no banco
         document.getElementById('nomeConvenio').value = convenioEditando.nome || '';
-        document.getElementById('codigoConvenio').value = convenioEditando.codigo || '';
-        
-        const telefoneInput = document.getElementById('telefoneConvenio');
-        const emailInput = document.getElementById('emailConvenio');
-        const descricaoInput = document.getElementById('descricaoConvenio');
-        if (telefoneInput) telefoneInput.value = convenioEditando.telefone || '';
-        if (emailInput) emailInput.value = convenioEditando.email || '';
-        if (descricaoInput) descricaoInput.value = convenioEditando.descricao || '';
+        document.getElementById('codigoConvenio').value = convenioEditando.cobertura_info || '';
         
         // Atualizar título e botão
         const formConvenio = document.getElementById('formConvenio');
@@ -226,28 +212,21 @@ async function atualizarConvenio() {
     const originalText = btnSubmit.innerHTML;
     
     try {
-        const telefoneInput = document.getElementById('telefoneConvenio');
-        const emailInput = document.getElementById('emailConvenio');
-        const descricaoInput = document.getElementById('descricaoConvenio');
-        
         const dados = {
             nome: document.getElementById('nomeConvenio').value,
-            codigo: document.getElementById('codigoConvenio').value,
-            telefone: telefoneInput?.value.trim() || null,
-            email: emailInput?.value.trim() || null,
-            descricao: descricaoInput?.value.trim() || null
+            cobertura_info: document.getElementById('codigoConvenio').value
         };
         
         // Validações
-        if (!dados.nome || !dados.codigo) {
-            showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
+        if (!dados.nome) {
+            showMessage('Por favor, preencha o nome do convênio!', 'error');
             return;
         }
         
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
         
-        await api.put(`/admin/convenios/${convenioEditando.id}`, dados);
+        await api.put(`${API_CONFIG.ENDPOINTS.ADMIN_PLANOS_SAUDE}/${convenioEditando.id_plano_saude}`, dados);
         
         showMessage('Convênio atualizado com sucesso!', 'success');
         document.getElementById('formConvenio').style.display = 'none';
@@ -345,11 +324,6 @@ function showMessage(message, type) {
     document.body.appendChild(alert);
     
     setTimeout(() => alert.remove(), 5000);
-}
-
-// Editar convênio (simplificado)
-function editarConvenio(id) {
-    showMessage('Funcionalidade em desenvolvimento', 'warning');
 }
 
 // Ver detalhes do convênio
