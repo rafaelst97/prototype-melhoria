@@ -60,7 +60,7 @@ function renderizarConvenios() {
                     <button class="btn btn-outline" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhes(${convenio.id_plano_saude})">
                         <i class="fas fa-eye"></i> Detalhes
                     </button>
-                    <button class="btn" style="padding: 5px 10px; background-color: var(--danger-color); color: white;" onclick="excluirConvenio(${convenio.id_plano_saude}, '${convenio.nome}')">
+                    <button class="btn" style="padding: 5px 10px; margin-right: 5px; background-color: #dc3545; color: white; border: none;" onclick="excluirConvenio(${convenio.id_plano_saude}, '${convenio.nome}')">
                         <i class="fas fa-trash"></i> Excluir
                     </button>
                 </td>
