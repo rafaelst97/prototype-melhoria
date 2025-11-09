@@ -11,8 +11,14 @@ from app.models.models import Paciente, Medico, Administrador
 from app.schemas.schemas import Token, LoginRequest, AlterarSenhaRequest
 from app.utils.auth import verify_password, create_access_token, get_password_hash
 from app.config import settings
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+
+
+class LoginCRMRequest(BaseModel):
+    crm: str
+    senha: str
 
 
 def autenticar_usuario(email: str, senha: str, db: Session) -> tuple:
@@ -91,13 +97,13 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login/crm", response_model=Token)
-def login_medico_por_crm(crm: str, senha: str, db: Session = Depends(get_db)):
+def login_medico_por_crm(login_data: LoginCRMRequest, db: Session = Depends(get_db)):
     """
     Login alternativo para médicos usando CRM ao invés de email
     """
-    medico = db.query(Medico).filter(Medico.crm == crm).first()
+    medico = db.query(Medico).filter(Medico.crm == login_data.crm).first()
     
-    if not medico or not verify_password(senha, medico.senha_hash):
+    if not medico or not verify_password(login_data.senha, medico.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="CRM ou senha incorretos",
