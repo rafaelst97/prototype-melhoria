@@ -57,8 +57,11 @@ function renderizarConvenios() {
                     <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="editarConvenio(${convenio.id_plano_saude})">
                         <i class="fas fa-edit"></i> Editar
                     </button>
-                    <button class="btn btn-outline" style="padding: 5px 10px;" onclick="verDetalhes(${convenio.id_plano_saude})">
+                    <button class="btn btn-outline" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhes(${convenio.id_plano_saude})">
                         <i class="fas fa-eye"></i> Detalhes
+                    </button>
+                    <button class="btn" style="padding: 5px 10px; background-color: var(--danger-color); color: white;" onclick="excluirConvenio(${convenio.id_plano_saude}, '${convenio.nome}')">
+                        <i class="fas fa-trash"></i> Excluir
                     </button>
                 </td>
             </tr>
@@ -200,40 +203,28 @@ async function atualizarConvenio() {
 }
 
 // Desativar convênio
-async function desativarConvenio(convenioId) {
-    if (!confirm('Deseja realmente desativar este convênio?')) {
+// Excluir convênio
+async function excluirConvenio(convenioId, nomeConvenio) {
+    if (!confirm(`⚠️ ATENÇÃO!\n\nDeseja realmente excluir o convênio "${nomeConvenio}"?\n\nEsta ação não pode ser desfeita!\n\nOBS: Não será possível excluir se houver pacientes vinculados a este convênio.`)) {
         return;
     }
     
     try {
         showLoading();
-        await api.delete(`/admin/convenios/${convenioId}`);
-        showMessage('Convênio desativado com sucesso!', 'success');
+        const response = await api.delete(`${API_CONFIG.ENDPOINTS.ADMIN_PLANOS_SAUDE}/${convenioId}`);
+        showMessage(response.mensagem || 'Convênio excluído com sucesso!', 'success');
         await carregarConvenios();
         hideLoading();
     } catch (error) {
-        console.error('Erro ao desativar:', error);
-        showMessage('Erro ao desativar convênio: ' + error.message, 'error');
+        console.error('Erro ao excluir:', error);
         hideLoading();
-    }
-}
-
-// Ativar convênio
-async function ativarConvenio(convenioId) {
-    if (!confirm('Deseja realmente reativar este convênio?')) {
-        return;
-    }
-    
-    try {
-        showLoading();
-        await api.put(`/admin/convenios/${convenioId}/ativar`, {});
-        showMessage('Convênio reativado com sucesso!', 'success');
-        await carregarConvenios();
-        hideLoading();
-    } catch (error) {
-        console.error('Erro ao ativar:', error);
-        showMessage('Erro ao reativar convênio: ' + error.message, 'error');
-        hideLoading();
+        
+        // Mensagem específica para erro de pacientes vinculados
+        if (error.message && error.message.includes('paciente')) {
+            showMessage(error.message, 'error');
+        } else {
+            showMessage('Erro ao excluir convênio: ' + error.message, 'error');
+        }
     }
 }
 
