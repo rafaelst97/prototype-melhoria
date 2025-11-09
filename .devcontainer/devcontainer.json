@@ -1,21 +1,29 @@
 {
-  "name": "Clínica Saúde+",
+  "name": "Clínica Saúde+ - Sistema Completo",
   "dockerComposeFile": "../docker-compose.yml",
   "service": "backend",
   "workspaceFolder": "/app",
-  "forwardPorts": [8000, 80, 5432],
+  "forwardPorts": [8000, 80, 5432, 5050],
   "portsAttributes": {
     "8000": {
       "label": "Backend API",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "visibility": "public"
     },
     "80": {
       "label": "Frontend",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
     },
     "5432": {
       "label": "PostgreSQL",
-      "onAutoForward": "silent"
+      "onAutoForward": "silent",
+      "visibility": "private"
+    },
+    "5050": {
+      "label": "pgAdmin",
+      "onAutoForward": "silent",
+      "visibility": "private"
     }
   },
   "customizations": {
@@ -24,11 +32,10 @@
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-azuretools.vscode-docker",
-        "ms-vscode.makefile-tools",
         "esbenp.prettier-vscode",
         "dbaeumer.vscode-eslint",
-        "bradlc.vscode-tailwindcss",
-        "ritwickdey.liveserver"
+        "ritwickdey.liveserver",
+        "ms-python.black-formatter"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -37,10 +44,15 @@
         "python.linting.flake8Enabled": true,
         "python.formatting.provider": "black",
         "editor.formatOnSave": true,
-        "files.autoSave": "afterDelay"
+        "files.autoSave": "afterDelay",
+        "terminal.integrated.defaultProfile.linux": "bash"
       }
     }
   },
-  "postCreateCommand": "pip install -r backend/requirements.txt && pip install -r backend/requirements-test.txt",
-  "remoteUser": "root"
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteUser": "root",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
 }
