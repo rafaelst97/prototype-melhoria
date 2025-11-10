@@ -97,7 +97,9 @@ html {
         transition: left 0.3s ease;
         overflow-y: auto;
         box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-        padding: 70px 0 20px 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
     }
     
     .navbar.mobile-active {
@@ -114,14 +116,19 @@ html {
     .nav-links {
         flex-direction: column;
         width: 100%;
-        margin-top: 0;
+        margin: 0;
         padding: 0;
         list-style: none;
+        display: flex !important;
+        flex: 1;
     }
     
     .navbar-links li,
     .nav-links li {
         width: 100%;
+        margin: 0;
+        padding: 0;
+        list-style: none;
     }
     
     .navbar-links a,
@@ -133,11 +140,27 @@ html {
         display: block;
         color: #2c3e50;
         text-decoration: none;
+        font-size: 16px;
+        transition: all 0.2s ease;
+    }
+    
+    .navbar-links a i,
+    .nav-links a i {
+        margin-right: 12px;
+        width: 20px;
+        text-align: center;
+        color: #3498db;
     }
     
     .navbar-links a:hover,
     .nav-links a:hover {
         background: #f8f9fa;
+        color: #3498db;
+        padding-left: 25px;
+    }
+    
+    .navbar-links a:hover i,
+    .nav-links a:hover i {
         color: #3498db;
     }
     
@@ -154,22 +177,25 @@ html {
         padding: 15px 20px;
         border-top: 2px solid #ecf0f1;
         margin-top: auto;
-        flex-direction: column;
+        display: flex !important;
+        flex-direction: column !important;
         align-items: flex-start !important;
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
+        gap: 10px;
+        width: 100%;
+        background: #f8f9fa;
     }
     
     .nav-user span {
-        margin-bottom: 10px;
+        margin: 0;
         color: #2c3e50;
+        display: block;
+        font-size: 14px;
     }
     
     .nav-user .btn {
-        width: 100%;
+        width: 100% !important;
+        margin: 0;
+        padding: 10px 15px !important;
     }
 }
 
@@ -246,14 +272,17 @@ html {
     
     /* Formulário de ações */
     .form-actions {
-        display: flex;
-        flex-direction: column-reverse;
-        gap: 10px;
+        display: flex !important;
+        flex-direction: column-reverse !important;
+        gap: 10px !important;
+        width: 100% !important;
     }
     
-    .form-actions button {
-        width: 100%;
-        margin: 0;
+    .form-actions button,
+    .form-actions .btn,
+    .form-actions a.btn {
+        width: 100% !important;
+        margin: 0 !important;
     }
     
     /* Campos com botões anexos */
@@ -264,6 +293,12 @@ html {
     [style*="display: flex; gap:"] select {
         flex: 1 1 100% !important;
         min-width: 100%;
+    }
+    
+    [style*="display: flex; gap:"] button,
+    [style*="display: flex; gap:"] .btn {
+        width: 100% !important;
+        margin-top: 10px;
     }
 }
 
@@ -317,9 +352,20 @@ html {
         gap: 15px;
     }
     
+    .card-header h3 {
+        margin-bottom: 0 !important;
+    }
+    
     .card-header button,
-    .card-header .btn {
-        width: 100%;
+    .card-header .btn,
+    .card-header a.btn {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    /* Botões em linha também devem empilhar */
+    .card-header > *:not(h3) {
+        width: 100% !important;
     }
 }
 
