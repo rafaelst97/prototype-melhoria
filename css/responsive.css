@@ -92,7 +92,7 @@ html {
         left: -100%;
         width: 280px;
         height: 100vh;
-        background: white;
+        background: #2c3e50 !important;
         z-index: 1000;
         transition: left 0.3s ease;
         overflow-y: auto;
@@ -138,10 +138,10 @@ html {
         width: 100% !important;
         text-align: left !important;
         padding: 15px 20px !important;
-        border-bottom: 1px solid #ecf0f1 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.1) !important;
         display: flex !important;
         align-items: center !important;
-        color: #2c3e50 !important;
+        color: white !important;
         text-decoration: none !important;
         font-size: 16px !important;
         transition: all 0.2s ease !important;
@@ -160,8 +160,8 @@ html {
     
     .navbar-links a:hover,
     .nav-links a:hover {
-        background: #f8f9fa !important;
-        color: #3498db !important;
+        background: rgba(52, 152, 219, 0.2) !important;
+        color: white !important;
         padding-left: 25px !important;
     }
     
@@ -184,30 +184,30 @@ html {
         content: none !important;
     }
     
-    .navbar-brand,
     .nav-brand {
         padding: 15px 20px;
-        border-bottom: 2px solid #3498db;
+        border-bottom: 2px solid rgba(255,255,255,0.2);
         margin-bottom: 10px;
         font-weight: bold;
-        color: #2c3e50;
+        color: white !important;
+        background: rgba(0,0,0,0.2);
     }
     
     .nav-user {
         padding: 15px 20px;
-        border-top: 2px solid #ecf0f1;
+        border-top: 2px solid rgba(255,255,255,0.2);
         margin-top: auto;
         display: flex !important;
         flex-direction: column !important;
         align-items: flex-start !important;
         gap: 10px;
         width: 100%;
-        background: #f8f9fa;
+        background: rgba(0,0,0,0.2) !important;
     }
     
     .nav-user span {
         margin: 0;
-        color: #2c3e50;
+        color: white !important;
         display: block;
         font-size: 14px;
     }
@@ -216,6 +216,14 @@ html {
         width: 100% !important;
         margin: 0;
         padding: 10px 15px !important;
+        background: transparent !important;
+        border: 2px solid white !important;
+        color: white !important;
+    }
+    
+    .nav-user .btn:hover {
+        background: white !important;
+        color: #2c3e50 !important;
     }
 }
 
