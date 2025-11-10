@@ -210,6 +210,33 @@ html {
         width: 100%;
         margin: 5px 0;
     }
+    
+    /* Grid de checkboxes/radios */
+    [style*="grid-template-columns: repeat(3"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Formulário de ações */
+    .form-actions {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+    
+    .form-actions button {
+        width: 100%;
+        margin: 0;
+    }
+    
+    /* Campos com botões anexos */
+    [style*="display: flex; gap:"] {
+        flex-wrap: wrap;
+    }
+    
+    [style*="display: flex; gap:"] select {
+        flex: 1 1 100% !important;
+        min-width: 100%;
+    }
 }
 
 /* ===== CARDS RESPONSIVOS ===== */
@@ -252,6 +279,19 @@ html {
     [class*="stat"] {
         min-width: 100% !important;
         margin-bottom: 10px;
+    }
+    
+    /* Card header com botões */
+    .card-header[style*="display: flex"],
+    .card-header[style*="justify-content: space-between"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 15px;
+    }
+    
+    .card-header button,
+    .card-header .btn {
+        width: 100%;
     }
 }
 
