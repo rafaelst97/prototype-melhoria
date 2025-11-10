@@ -5,27 +5,44 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     // Criar botão de menu mobile se não existir
-    if (!document.querySelector('.mobile-menu-toggle')) {
+    const existingToggle = document.querySelector('.mobile-menu-toggle');
+    
+    if (!existingToggle) {
         const navbar = document.querySelector('.navbar');
+        
         if (navbar) {
+            // Criar botão toggle
             const toggleBtn = document.createElement('button');
             toggleBtn.className = 'mobile-menu-toggle';
             toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
             toggleBtn.setAttribute('aria-label', 'Toggle menu');
+            toggleBtn.setAttribute('type', 'button');
             
-            // Inserir antes do navbar
-            navbar.parentNode.insertBefore(toggleBtn, navbar);
+            // Inserir no início do body
+            document.body.insertBefore(toggleBtn, document.body.firstChild);
             
-            // Criar overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'mobile-overlay';
-            document.body.appendChild(overlay);
+            // Criar overlay se não existir
+            let overlay = document.querySelector('.mobile-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'mobile-overlay';
+                document.body.appendChild(overlay);
+            }
             
             // Toggle menu
-            toggleBtn.addEventListener('click', function() {
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 navbar.classList.toggle('mobile-active');
                 overlay.classList.toggle('active');
                 document.body.style.overflow = navbar.classList.contains('mobile-active') ? 'hidden' : '';
+                
+                // Mudar ícone
+                const icon = toggleBtn.querySelector('i');
+                if (navbar.classList.contains('mobile-active')) {
+                    icon.className = 'fas fa-times';
+                } else {
+                    icon.className = 'fas fa-bars';
+                }
             });
             
             // Fechar ao clicar no overlay
@@ -33,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 navbar.classList.remove('mobile-active');
                 overlay.classList.remove('active');
                 document.body.style.overflow = '';
+                toggleBtn.querySelector('i').className = 'fas fa-bars';
             });
             
             // Fechar ao clicar em um link
@@ -42,7 +60,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     navbar.classList.remove('mobile-active');
                     overlay.classList.remove('active');
                     document.body.style.overflow = '';
+                    toggleBtn.querySelector('i').className = 'fas fa-bars';
                 });
+            });
+            
+            // Fechar ao pressionar ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && navbar.classList.contains('mobile-active')) {
+                    navbar.classList.remove('mobile-active');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                    toggleBtn.querySelector('i').className = 'fas fa-bars';
+                }
             });
         }
     }
