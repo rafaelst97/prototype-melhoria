@@ -291,9 +291,27 @@ body {
     margin-bottom: 20px;
 }
 
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .card-header h3 {
     color: var(--primary-color);
     font-size: 1.3em;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.9em;
 }
 
 /* Tables */

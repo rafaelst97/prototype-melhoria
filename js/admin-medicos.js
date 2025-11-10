@@ -103,21 +103,23 @@ function renderizarMedicos() {
         
         return `
             <tr>
-                <td>${medico.nome || 'N/A'}</td>
-                <td>${medico.crm || 'N/A'}</td>
-                <td>${especialidade.nome || 'N/A'}</td>
-                <td>${conveniosTexto}</td>
-                <td><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
-                <td>
-                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhesMedico(${medico.id_medico})" title="Ver detalhes">
-                        <i class="fas fa-eye"></i> Ver
-                    </button>
-                    <button class="btn btn-primary" style="padding: 5px 10px; margin-right: 5px;" onclick="editarMedico(${medico.id_medico})" title="Editar médico">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-outline" style="padding: 5px 10px;" onclick="desativarMedico(${medico.id_medico})" title="Excluir médico">
-                        <i class="fas fa-trash"></i> Excluir
-                    </button>
+                <td data-label="Nome">${medico.nome || 'N/A'}</td>
+                <td data-label="CRM">${medico.crm || 'N/A'}</td>
+                <td data-label="Especialidade">${especialidade.nome || 'N/A'}</td>
+                <td data-label="Convênios">${conveniosTexto}</td>
+                <td data-label="Status"><span style="color: var(--tertiary-color);"><i class="fas fa-check-circle"></i> Ativo</span></td>
+                <td data-label="Ações">
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary btn-sm" onclick="verDetalhesMedico(${medico.id_medico})" title="Ver detalhes">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="editarMedico(${medico.id_medico})" title="Editar médico">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-outline btn-sm" onclick="desativarMedico(${medico.id_medico})" title="Excluir médico">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;

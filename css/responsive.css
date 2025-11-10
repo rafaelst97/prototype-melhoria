@@ -238,6 +238,30 @@ html {
     table td:last-child {
         border-bottom: 0;
     }
+    
+    /* Action buttons - empilhar no mobile */
+    .action-buttons {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100%;
+    }
+    
+    .action-buttons button,
+    .action-buttons .btn {
+        width: 100% !important;
+        margin: 0 !important;
+        justify-content: center;
+    }
+    
+    table td[data-label="Ações"] {
+        text-align: center;
+        padding: 15px;
+    }
+    
+    table td[data-label="Ações"]::before {
+        display: none;
+    }
 }
 
 /* ===== FORMULÁRIOS RESPONSIVOS ===== */
@@ -322,6 +346,25 @@ html {
     .grid-4 {
         grid-template-columns: 1fr !important;
         gap: 15px;
+    }
+    
+    /* Card header flex - empilhar no mobile */
+    .card-header-flex {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 15px !important;
+    }
+    
+    .card-header-flex h3 {
+        margin-bottom: 0 !important;
+        width: 100%;
+    }
+    
+    .card-header-flex button,
+    .card-header-flex .btn,
+    .card-header-flex a.btn {
+        width: 100% !important;
+        margin: 0 !important;
     }
     
     /* Grids inline style também */
