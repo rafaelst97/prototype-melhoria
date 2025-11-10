@@ -92,7 +92,7 @@ html {
         left: -100%;
         width: 280px;
         height: 100vh;
-        background: #2c3e50 !important;
+        background: var(--primary-color) !important;
         z-index: 1000;
         transition: left 0.3s ease;
         overflow-y: auto;
@@ -141,7 +141,7 @@ html {
         border-bottom: 1px solid rgba(255,255,255,0.1) !important;
         display: flex !important;
         align-items: center !important;
-        color: white !important;
+        color: var(--white) !important;
         text-decoration: none !important;
         font-size: 16px !important;
         transition: all 0.2s ease !important;
@@ -154,20 +154,20 @@ html {
         width: 20px !important;
         min-width: 20px !important;
         text-align: center !important;
-        color: #3498db !important;
+        color: var(--white) !important;
         flex-shrink: 0 !important;
     }
     
     .navbar-links a:hover,
     .nav-links a:hover {
-        background: rgba(52, 152, 219, 0.2) !important;
-        color: white !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        color: var(--white) !important;
         padding-left: 25px !important;
     }
     
     .navbar-links a:hover i,
     .nav-links a:hover i {
-        color: #3498db !important;
+        color: var(--white) !important;
     }
     
     /* Garantir que o texto apareça */
@@ -186,28 +186,29 @@ html {
     
     .nav-brand {
         padding: 15px 20px;
-        border-bottom: 2px solid rgba(255,255,255,0.2);
-        margin-bottom: 10px;
+        border-bottom: 2px solid rgba(255,255,255,0.1);
+        margin-bottom: 0;
         font-weight: bold;
-        color: white !important;
-        background: rgba(0,0,0,0.2);
+        color: var(--white) !important;
+        background: transparent;
+        font-size: 1.2em;
     }
     
     .nav-user {
         padding: 15px 20px;
-        border-top: 2px solid rgba(255,255,255,0.2);
+        border-top: 2px solid rgba(255,255,255,0.1);
         margin-top: auto;
         display: flex !important;
         flex-direction: column !important;
         align-items: flex-start !important;
         gap: 10px;
         width: 100%;
-        background: rgba(0,0,0,0.2) !important;
+        background: transparent !important;
     }
     
     .nav-user span {
         margin: 0;
-        color: white !important;
+        color: var(--white) !important;
         display: block;
         font-size: 14px;
     }
@@ -217,13 +218,13 @@ html {
         margin: 0;
         padding: 10px 15px !important;
         background: transparent !important;
-        border: 2px solid white !important;
-        color: white !important;
+        border: 2px solid var(--white) !important;
+        color: var(--white) !important;
     }
     
     .nav-user .btn:hover {
-        background: white !important;
-        color: #2c3e50 !important;
+        background: var(--white) !important;
+        color: var(--primary-color) !important;
     }
 }
 
