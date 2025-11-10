@@ -48,21 +48,23 @@ function renderizarConvenios() {
         
         return `
             <tr>
-                <td><strong>${convenio.nome || 'N/A'}</strong></td>
-                <td>${cobertura}</td>
-                <td style="text-align: center;">${convenio.qtd_pacientes || 0}</td>
-                <td style="text-align: center;">${convenio.consultas_mes || 0}</td>
-                <td>${statusHtml}</td>
-                <td>
-                    <button class="btn btn-secondary" style="padding: 5px 10px; margin-right: 5px;" onclick="editarConvenio(${convenio.id_plano_saude})">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-outline" style="padding: 5px 10px; margin-right: 5px;" onclick="verDetalhes(${convenio.id_plano_saude})">
-                        <i class="fas fa-eye"></i> Detalhes
-                    </button>
-                    <button class="btn" style="padding: 5px 10px; margin-right: 5px; background-color: #dc3545; color: white; border: none;" onclick="excluirConvenio(${convenio.id_plano_saude}, '${convenio.nome}')">
-                        <i class="fas fa-trash"></i> Excluir
-                    </button>
+                <td data-label="Convênio"><strong>${convenio.nome || 'N/A'}</strong></td>
+                <td data-label="Cobertura">${cobertura}</td>
+                <td data-label="Pacientes Cadastrados" style="text-align: center;">${convenio.qtd_pacientes || 0}</td>
+                <td data-label="Consultas Este Mês" style="text-align: center;">${convenio.consultas_mes || 0}</td>
+                <td data-label="Status">${statusHtml}</td>
+                <td data-label="Ações">
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary btn-sm" onclick="editarConvenio(${convenio.id_plano_saude})">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-outline btn-sm" onclick="verDetalhes(${convenio.id_plano_saude})">
+                            <i class="fas fa-eye"></i> Detalhes
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="excluirConvenio(${convenio.id_plano_saude}, '${convenio.nome}')">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
