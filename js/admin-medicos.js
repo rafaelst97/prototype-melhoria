@@ -3,6 +3,33 @@ let medicos = [];
 let especialidades = [];
 let conveniosMedicos = {}; // Armazena convênios por médico (temporário até backend implementar)
 
+// Funções do Modal
+function abrirModalCadastro() {
+    const modal = document.getElementById('modalCadastroMedico');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Previne scroll da página
+    }
+}
+
+function fecharModalCadastro() {
+    const modal = document.getElementById('modalCadastroMedico');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restaura scroll da página
+        // Limpar formulário
+        document.getElementById('cadastroMedicoForm').reset();
+    }
+}
+
+// Fechar modal ao clicar fora dele
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCadastroMedico');
+    if (event.target === modal) {
+        fecharModalCadastro();
+    }
+}
+
 // Carregar convênios do localStorage
 function carregarConveniosLocalStorage() {
     const stored = localStorage.getItem('convenios_medicos');
@@ -32,7 +59,36 @@ document.addEventListener('DOMContentLoaded', async function() {
     await carregarEspecialidades();
     await carregarMedicos();
     configurarFormularioCadastro();
+    configurarFormularioModal();
 });
+
+// Configurar formulário do modal
+function configurarFormularioModal() {
+    const form = document.getElementById('cadastroMedicoForm');
+    
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await cadastrarMedico();
+        });
+    }
+    
+    // Adicionar máscara de telefone
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput && typeof maskPhone !== 'undefined') {
+        telefoneInput.addEventListener('input', (e) => {
+            e.target.value = maskPhone(e.target.value);
+        });
+    }
+    
+    // Adicionar máscara de CPF
+    const cpfInput = document.getElementById('cpf');
+    if (cpfInput && typeof maskCPF !== 'undefined') {
+        cpfInput.addEventListener('input', (e) => {
+            e.target.value = maskCPF(e.target.value);
+        });
+    }
+}
 
 // Carregar especialidades
 async function carregarEspecialidades() {
@@ -198,6 +254,8 @@ async function cadastrarMedico() {
             id_especialidade_fk: parseInt(document.getElementById('especialidade').value)
         };
         
+        console.log('Dados do médico a cadastrar:', dados);
+        
         // Validações
         if (!dados.nome || !dados.cpf || !dados.email || !dados.senha || !dados.crm || !dados.id_especialidade_fk) {
             showMessage('Por favor, preencha todos os campos obrigatórios!', 'error');
@@ -222,20 +280,36 @@ async function cadastrarMedico() {
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cadastrando...';
         
+        console.log('Enviando requisição para:', API_CONFIG.ENDPOINTS.ADMIN_MEDICO_CRIAR);
         const medicoNovo = await api.post(API_CONFIG.ENDPOINTS.ADMIN_MEDICO_CRIAR, dados);
+        console.log('Médico cadastrado com sucesso:', medicoNovo);
         
         // Salvar convênios no localStorage
         conveniosMedicos[medicoNovo.id_medico] = conveniosSelecionados;
         salvarConveniosLocalStorage();
         
         showMessage('Médico cadastrado com sucesso!', 'success');
-        document.getElementById('formCadastro').style.display = 'none';
+        fecharModalCadastro();
         form.reset();
         await carregarMedicos();
         
     } catch (error) {
-        console.error('Erro ao cadastrar médico:', error);
-        showMessage('Erro ao cadastrar médico: ' + error.message, 'error');
+        console.error('Erro completo ao cadastrar médico:', error);
+        
+        // Extrair mensagem de erro mais específica
+        let mensagemErro = 'Erro ao cadastrar médico.';
+        
+        if (error.message) {
+            if (error.message.includes('already exists') || error.message.includes('já existe') || error.message.includes('cadastrado')) {
+                mensagemErro = 'Este email, CPF ou CRM já está cadastrado no sistema.';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                mensagemErro = 'Erro de conexão. Verifique se o servidor está rodando.';
+            } else {
+                mensagemErro = error.message;
+            }
+        }
+        
+        showMessage(mensagemErro, 'error');
     } finally {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = originalText;
@@ -328,6 +402,12 @@ async function editarMedico(medicoId) {
         const medico = await api.get(`/admin/medicos/${medicoId}`);
         hideLoading();
         
+        // Abrir modal
+        abrirModalCadastro();
+        
+        // Aguardar um pouco para garantir que o modal está visível
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Preencher formulário com dados atuais
         document.getElementById('nome').value = medico.nome || '';
         document.getElementById('cpf').value = formatarCPF(medico.cpf) || '';
@@ -342,26 +422,31 @@ async function editarMedico(medicoId) {
             checkbox.checked = conveniosSalvos.includes(checkbox.value);
         });
         
-        // Mostrar campo senha mas torná-lo opcional na edição
-        const senhaGroup = document.getElementById('senha').closest('.form-group');
-        if (senhaGroup) {
-            senhaGroup.style.display = 'block';
-            document.getElementById('senha').required = false;
-            document.getElementById('senha').placeholder = 'Deixe em branco para manter a senha atual';
+        // Tornar senha opcional na edição
+        const senhaInput = document.getElementById('senha');
+        if (senhaInput) {
+            senhaInput.required = false;
+            senhaInput.placeholder = 'Deixe em branco para manter a senha atual';
+            senhaInput.value = '';
         }
         
-        // Alterar título e botão do formulário
-        document.querySelector('#formCadastro .card-header h3').innerHTML = '<i class="fas fa-edit"></i> Editar Médico';
-        const btnSubmit = document.querySelector('#btnSalvar');
-        btnSubmit.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
-        btnSubmit.onclick = async (e) => {
-            e.preventDefault();
-            await salvarEdicaoMedico(medicoId);
-        };
+        // Alterar título e botão do modal
+        const modalHeader = document.querySelector('#modalCadastroMedico .modal-header h3');
+        if (modalHeader) {
+            modalHeader.innerHTML = '<i class="fas fa-edit"></i> Editar Médico';
+        }
         
-        // Mostrar formulário
-        document.getElementById('formCadastro').style.display = 'block';
-        document.getElementById('formCadastro').scrollIntoView({ behavior: 'smooth' });
+        const btnSubmit = document.querySelector('#btnSalvar');
+        if (btnSubmit) {
+            btnSubmit.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+            // Remover event listener antigo e adicionar novo
+            const newBtn = btnSubmit.cloneNode(true);
+            btnSubmit.parentNode.replaceChild(newBtn, btnSubmit);
+            newBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await salvarEdicaoMedico(medicoId);
+            });
+        }
         
     } catch (error) {
         console.error('Erro ao carregar médico para edição:', error);
@@ -435,59 +520,52 @@ async function salvarEdicaoMedico(medicoId) {
         
         showMessage('Médico atualizado com sucesso!', 'success');
         
-        // Resetar formulário para modo cadastro
-        resetarFormulario();
+        // Fechar modal e resetar
+        fecharModalCadastro();
+        resetarFormularioModal();
         
         await carregarMedicos();
         
     } catch (error) {
         console.error('Erro ao atualizar médico:', error);
         showMessage('Erro ao atualizar médico: ' + error.message, 'error');
+    } finally {
         btnSubmit.disabled = false;
         btnSubmit.innerHTML = originalText;
     }
 }
 
-// Resetar formulário para modo cadastro
-function resetarFormulario() {
+// Resetar formulário do modal para modo cadastro
+function resetarFormularioModal() {
     const form = document.getElementById('cadastroMedicoForm');
-    const formCadastro = document.getElementById('formCadastro');
-    
-    // Esconder formulário
-    formCadastro.style.display = 'none';
     
     // Limpar campos
     form.reset();
     
     // Restaurar título
-    document.querySelector('#formCadastro .card-header h3').innerHTML = 'Cadastrar Novo Médico';
-    
-    // Restaurar botão
-    const btnSubmit = document.querySelector('#btnSalvar');
-    btnSubmit.innerHTML = '<i class="fas fa-check"></i> Cadastrar Médico';
-    btnSubmit.onclick = null;
-    btnSubmit.disabled = false;
-    
-    // Mostrar campo senha e torná-lo obrigatório
-    const senhaGroup = document.getElementById('senha').closest('.form-group');
-    if (senhaGroup) {
-        senhaGroup.style.display = 'block';
-        const senhaInput = document.getElementById('senha');
-        senhaInput.required = true;
-        senhaInput.placeholder = 'Senha de acesso';
+    const modalHeader = document.querySelector('#modalCadastroMedico .modal-header h3');
+    if (modalHeader) {
+        modalHeader.innerHTML = 'Cadastrar Novo Médico';
     }
     
-    // Reabilitar campos que foram desabilitados na edição
-    document.getElementById('cpf').disabled = false;
-    document.getElementById('email').disabled = false;
-    document.getElementById('crm').disabled = false;
-    document.getElementById('telefone').disabled = false;
+    // Restaurar botão e seu comportamento
+    const btnSubmit = document.querySelector('#btnSalvar');
+    if (btnSubmit) {
+        btnSubmit.innerHTML = 'Cadastrar Médico';
+        // Remover event listener antigo e restaurar original
+        const newBtn = btnSubmit.cloneNode(true);
+        btnSubmit.parentNode.replaceChild(newBtn, btnSubmit);
+    }
     
-    // Restaurar estilo dos campos
-    document.getElementById('cpf').style.backgroundColor = '';
-    document.getElementById('email').style.backgroundColor = '';
-    document.getElementById('crm').style.backgroundColor = '';
-    document.getElementById('telefone').style.backgroundColor = '';
+    // Tornar senha obrigatória novamente
+    const senhaInput = document.getElementById('senha');
+    if (senhaInput) {
+        senhaInput.required = true;
+        senhaInput.placeholder = 'Mínimo 8 caracteres';
+    }
+    
+    // Reconfigurar formulário
+    configurarFormularioModal();
 }
 
 // Desativar médico

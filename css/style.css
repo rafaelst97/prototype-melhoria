@@ -330,12 +330,25 @@ table td {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
 }
 
 table th {
     background: var(--light-bg);
     color: var(--primary-color);
     font-weight: 600;
+    white-space: nowrap;
+}
+
+table td {
+    word-wrap: break-word;
+}
+
+table td small {
+    display: block;
+    font-size: 0.85em;
+    color: var(--text-light);
+    margin-top: 2px;
 }
 
 table tr:hover {
@@ -623,6 +636,20 @@ table tr:hover {
 }
 
 /* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -659,6 +686,28 @@ table tr:hover {
 .modal-header h3 {
     color: var(--primary-color);
     margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 2em;
+    color: var(--text-light);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+    background: var(--light-bg);
+    color: var(--accent-color);
 }
 
 .modal-body {

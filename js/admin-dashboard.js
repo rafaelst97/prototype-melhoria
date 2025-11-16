@@ -97,6 +97,7 @@ async function carregarConsultasRecentes() {
             
             const statusConfig = {
                 'agendada': { cor: 'var(--secondary-color)', icone: 'fa-clock' },
+                'confirmada': { cor: '#27ae60', icone: 'fa-check-circle' },
                 'realizada': { cor: 'var(--tertiary-color)', icone: 'fa-check-circle' },
                 'cancelada': { cor: 'var(--accent-color)', icone: 'fa-times-circle' },
                 'faltou': { cor: '#ff6b6b', icone: 'fa-user-times' }
@@ -108,11 +109,11 @@ async function carregarConsultasRecentes() {
             
             return `
                 <tr>
-                    <td>${dataFormatada} ${horaFormatada}</td>
-                    <td>${consulta.paciente?.nome || 'N/A'}</td>
-                    <td>${consulta.medico?.nome || 'N/A'}</td>
-                    <td>${consulta.medico?.especialidade?.nome || 'N/A'}</td>
-                    <td><span style="color: ${config.cor};"><i class="fas ${config.icone}"></i> ${statusCapitalizado}</span></td>
+                    <td data-label="Data">${dataFormatada}<br><small style="color: #666;">${horaFormatada}</small></td>
+                    <td data-label="Paciente">${consulta.paciente?.nome || 'N/A'}</td>
+                    <td data-label="Médico">${consulta.medico?.nome || 'N/A'}</td>
+                    <td data-label="Especialidade">${consulta.medico?.especialidade?.nome || 'N/A'}</td>
+                    <td data-label="Status"><span style="color: ${config.cor}; white-space: nowrap;"><i class="fas ${config.icone}"></i> ${statusCapitalizado}</span></td>
                 </tr>
             `;
         }).join('');

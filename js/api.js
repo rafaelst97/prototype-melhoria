@@ -202,9 +202,10 @@ class APIClient {
                 throw new Error('Sessão expirada. Faça login novamente.');
             }
 
-            // Tratar erro de email duplicado
+            // Tratar erro de conflito (409) - dados duplicados
             if (response.status === 409) {
-                throw new Error('Este email já está cadastrado. Tente fazer login ou use outro email.');
+                const mensagem = data.detail || 'Este registro já está cadastrado no sistema.';
+                throw new Error(mensagem);
             }
 
             // Tratar erro de CPF duplicado
@@ -212,7 +213,8 @@ class APIClient {
                 throw new Error('Este CPF já está cadastrado no sistema.');
             }
 
-            throw new Error(data.detail || 'Erro na requisição');
+            // Retornar mensagem específica do backend se existir
+            throw new Error(data.detail || data.message || 'Erro na requisição');
         }
 
         return data;
