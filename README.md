@@ -2,11 +2,6 @@
 
 Sistema completo de gerenciamento de clínicas médicas com funcionalidades para pacientes, médicos e administradores.
 
-[![Backend Tests](https://github.com/rafaelst97/prototype-melhoria/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/rafaelst97/prototype-melhoria/actions/workflows/backend-tests.yml)
-[![Deploy to GitHub Pages](https://github.com/rafaelst97/prototype-melhoria/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/rafaelst97/prototype-melhoria/actions/workflows/deploy-pages.yml)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/rafaelst97/prototype-melhoria/releases/tag/v2.0.0)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
 ---
 
 ##  Sobre o Projeto
