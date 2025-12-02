@@ -69,6 +69,12 @@ docker-compose up -d
 - Documentação da API: http://localhost:8000/docs
 - PgAdmin: http://localhost:5050
 
+### 🌐 Aplicação em Produção
+
+Acesse a aplicação já implantada: **[Clínica Saúde+ - Deploy](https://clinica-saude-frontend.onrender.com)**
+
+> **Nota**: O primeiro acesso pode demorar ~30 segundos devido ao cold start do Render.
+
 ### Credenciais de acesso
 
 #### 🔑 Administrador
