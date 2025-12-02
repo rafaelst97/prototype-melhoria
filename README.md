@@ -193,7 +193,7 @@ Consulte [docs/deploy/](docs/deploy/) para instruções detalhadas.
 
 ##  Equipe
 
-Desenvolvido por **Rafael dos Santos, Caio Sabino Soares e Júlia Cansian Rocha** como projeto da disciplina de Melhoria de Processos de Software - UNIVALI.
+Desenvolvido por **Caio Cesar Sabino Soares, Júlia Cansian Rocha e Rafael dos Santos** como projeto da disciplina de Melhoria de Processos de Software - UNIVALI.
 
 ---
 
