@@ -193,7 +193,7 @@ Consulte [docs/deploy/](docs/deploy/) para instruções detalhadas.
 
 ##  Equipe
 
-Desenvolvido por **Rafael Scheffel Theiss** como projeto da disciplina de Melhoria de Processos de Software - UNIVALI.
+Desenvolvido por **Rafael dos Santos, Caio Sabino Soares e Júlia Cansian Rocha** como projeto da disciplina de Melhoria de Processos de Software - UNIVALI.
 
 ---
 
@@ -211,4 +211,4 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ---
 
-**Versão**: 2.0.0 | **Última atualização**: Janeiro 2025
+**Versão**: 2.2.0 | **Última atualização**: Dezembro 2025
