@@ -71,17 +71,17 @@ docker-compose up -d
 
 ### Credenciais de acesso
 
-#### Administrador
-- **Usuário**: admin
+#### 🔑 Administrador
+- **Email**: admin@clinica.com
 - **Senha**: admin123
 
-#### Médico de Teste
-- **CPF**: 11122233344
-- **Senha**: senha123
+#### 👨‍⚕️ Médico de Teste
+- **Email**: joao.silva@clinica.com
+- **Senha**: medico123
 
-#### Paciente de Teste
-- **CPF**: 12345678901
-- **Senha**: senha123
+#### 📋 Paciente de Teste
+- **Email**: maria.oliveira@email.com
+- **Senha**: paciente123
 
 ---
 
